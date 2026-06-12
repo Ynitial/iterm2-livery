@@ -1,4 +1,4 @@
-from iterm_favicon.tint import mute
+from livery.tint import mute
 
 
 def test_mute_dark_blends_to_black():

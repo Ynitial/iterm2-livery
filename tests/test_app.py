@@ -1,7 +1,7 @@
 import os
 
-from iterm_favicon import app, escapes, store
-from iterm_favicon.profile import profile_file
+from livery import app, escapes, store
+from livery.profile import profile_file
 
 
 def _dirs(tmp_path):
@@ -24,7 +24,7 @@ def test_emit_manifest_sets_icon_color_and_title(tmp_path, make_png, monkeypatch
     out = app.cmd_emit(cwd=tmp_path, **d)
 
     assert "]0;Slowboard\007" in out
-    assert "SetProfile=favicon:" in out
+    assert "SetProfile=livery:" in out
     entry = store.read_entry(d["store_dir"], tmp_path.resolve())
     assert entry["dominant_color"] == [40, 80, 200]
     assert entry["name"] == "Slowboard"
@@ -64,7 +64,7 @@ def test_emit_uses_store_without_rescanning(tmp_path, make_png, monkeypatch):
     monkeypatch.setattr(app, "color_from_png", boom)
     out = app.cmd_emit(cwd=tmp_path, **d)
     assert "]0;Cached\007" in out
-    assert "SetProfile=favicon:" in out
+    assert "SetProfile=livery:" in out
 
 
 def test_emit_missing_icon_file_resets(tmp_path, monkeypatch):
@@ -155,7 +155,7 @@ from pathlib import Path
 def test_cli_emit_not_a_project_prints_reset(tmp_path):
     repo = Path(__file__).resolve().parent.parent
     proc = subprocess.run(
-        [sys.executable, "-m", "iterm_favicon", "emit",
+        [sys.executable, "-m", "livery", "emit",
          "--cwd", str(tmp_path),
          "--profiles-dir", str(tmp_path / "p"),
          "--store-dir", str(tmp_path / "s")],
@@ -169,7 +169,7 @@ def test_cli_rename_prints_title(tmp_path):
     repo = Path(__file__).resolve().parent.parent
     (tmp_path / ".env").write_text("APP_NAME=EnvApp\n")
     proc = subprocess.run(
-        [sys.executable, "-m", "iterm_favicon", "rename", "dev",
+        [sys.executable, "-m", "livery", "rename", "dev",
          "--cwd", str(tmp_path),
          "--profiles-dir", str(tmp_path / "p"),
          "--store-dir", str(tmp_path / "s")],

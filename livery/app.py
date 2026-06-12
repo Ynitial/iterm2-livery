@@ -1,28 +1,28 @@
 import os
 from pathlib import Path
 
-from iterm_favicon import escapes, store
-from iterm_favicon.color import color_from_png
-from iterm_favicon.manifest import find_manifest, first_png
-from iterm_favicon.profile import build_profile, profile_file, profile_name, write_profile
-from iterm_favicon.roots import find_project_root
-from iterm_favicon.tint import detect_theme, mute
-from iterm_favicon.title import base_name, tab_title
+from livery import escapes, store
+from livery.color import color_from_png
+from livery.manifest import find_manifest, first_png
+from livery.profile import build_profile, profile_file, profile_name, write_profile
+from livery.roots import find_project_root
+from livery.tint import detect_theme, mute
+from livery.title import base_name, tab_title
 
-DEFAULT_STORE = Path.home() / ".config" / "iterm-favicon" / "dirs"
+DEFAULT_STORE = Path.home() / ".config" / "livery" / "dirs"
 DEFAULT_PROFILES = Path.home() / "Library" / "Application Support" / "iTerm2" / "DynamicProfiles"
 
 
 def _tab_strength():
-    return float(os.environ.get("ITERM_FAVICON_TAB_STRENGTH", "0.15"))
+    return float(os.environ.get("LIVERY_TAB_STRENGTH", "0.15"))
 
 
 def _bg_strength():
-    return float(os.environ.get("ITERM_FAVICON_BG_STRENGTH", "0.07"))
+    return float(os.environ.get("LIVERY_BG_STRENGTH", "0.07"))
 
 
 def _maxdepth():
-    return int(os.environ.get("ITERM_FAVICON_MAXDEPTH", "6"))
+    return int(os.environ.get("LIVERY_MAXDEPTH", "6"))
 
 
 def _detect(root, force=False):
@@ -67,9 +67,6 @@ def _emit(entry, theme):
     else:
         out += escapes.default_look()
     return out
-
-
-from iterm_favicon.profile import profile_guid
 
 
 def cmd_emit(cwd, profiles_dir, store_dir):
@@ -148,7 +145,7 @@ def cmd_clean(profiles_dir, store_dir):
         root = entry.get("root", "")
         if root and not Path(root).exists():
             store.delete_entry(store_dir, root)
-            pf = Path(profiles_dir) / f"{profile_guid(root)}.json"
+            pf = profile_file(profiles_dir, root)
             if pf.exists():
                 pf.unlink()
             removed.append(root)

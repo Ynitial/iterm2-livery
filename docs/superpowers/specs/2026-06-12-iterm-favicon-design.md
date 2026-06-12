@@ -1,4 +1,4 @@
-# iterm-favicon — Design
+# livery — Design
 
 **Datum:** 2026-06-12
 **Status:** Ontwerp goedgekeurd, klaar voor implementatieplan
@@ -51,7 +51,7 @@ Bronnen:
 
 Twee lagen:
 
-### 1. zsh-laag (`iterm-favicon.zsh`)
+### 1. zsh-laag (`livery.zsh`)
 Een dun bestand dat vanuit `~/.zshrc` wordt ge-`source`d. Het:
 - registreert een `chpwd`-hook (draait bij elke `cd`);
 - draait één keer bij shell-startup (op de startmap);
@@ -60,17 +60,17 @@ Een dun bestand dat vanuit `~/.zshrc` wordt ge-`source`d. Het:
   breken (helper-aanroep met timeout-bewustzijn, fouten naar /dev/null tenzij
   logging aanstaat).
 
-### 2. Python-helper (`iterm_favicon.py`)
+### 2. Python-helper (`livery.py`)
 Het testbare hart. Stdlib + de macOS-ingebouwde `sips`. Verantwoordelijk voor:
 manifest zoeken, parsen, PNG→kleur, profiel schrijven, escape-sequences printen.
 
 Aanroep-contract (zodat tests geïsoleerd draaien):
 ```
-iterm_favicon.py emit     --cwd <dir> --profiles-dir <dir> --store-dir <dir>
-iterm_favicon.py reeval   --cwd <dir> --profiles-dir <dir> --store-dir <dir>
-iterm_favicon.py set-icon <pad> --cwd <dir> --profiles-dir <dir> --store-dir <dir>
-iterm_favicon.py rename   [custom] --cwd <dir> --profiles-dir <dir> --store-dir <dir>
-iterm_favicon.py clean    --profiles-dir <dir> --store-dir <dir>
+livery.py emit     --cwd <dir> --profiles-dir <dir> --store-dir <dir>
+livery.py reeval   --cwd <dir> --profiles-dir <dir> --store-dir <dir>
+livery.py set-icon <pad> --cwd <dir> --profiles-dir <dir> --store-dir <dir>
+livery.py rename   [custom] --cwd <dir> --profiles-dir <dir> --store-dir <dir>
+livery.py clean    --profiles-dir <dir> --store-dir <dir>
 ```
 - `emit` — leest de store voor de huidige project-root; bij een treffer emit het
   meteen (snel pad). Bij geen treffer: auto-detecteren, store vullen, emitten.
@@ -95,7 +95,7 @@ maar zijn override-baar in tests.
    zoekgebied als de store-sleutel — zo werkt het ook vanuit een submap zoals
    `src/`.
 3. **Store-lookup:** is er een store-entry voor deze root
-   (`~/.config/iterm-favicon/dirs/<hash(root)>.json`)?
+   (`~/.config/livery/dirs/<hash(root)>.json`)?
    - **Treffer (snelpad):** lees icoon-pad + ruwe dominante kleur uit de store,
      bereken de gemute tints voor het huidige thema (zie stap 7), zorg dat het
      profiel up-to-date is, en emit. **Geen manifest-scan, geen `sips`.**
@@ -120,17 +120,17 @@ maar zijn override-baar in tests.
    - Systeem-thema via `defaults read -g AppleInterfaceStyle`
      ("Dark" → bg = zwart; fout/afwezig → bg = wit).
    - `tint = kleur × sterkte + bg × (1 − sterkte)`.
-   - Twee sterktes: tab (`ITERM_FAVICON_TAB_STRENGTH`, default 0.15) en
-     achtergrond (`ITERM_FAVICON_BG_STRENGTH`, default 0.07).
+   - Twee sterktes: tab (`LIVERY_TAB_STRENGTH`, default 0.15) en
+     achtergrond (`LIVERY_BG_STRENGTH`, default 0.07).
 8. **Store-entry schrijven** (alleen bij auto-detectie of `set-icon`/`reeval`):
    sla in `dirs/<hash(root)>.json` op: `root`-pad, `icon_path`, ruwe
    `dominant_color` (RGB), en de bron (`manifest` of `manual`). De gemute tint
    wordt **niet** opgeslagen — die hangt van het thema af en wordt bij elke
    `emit` opnieuw berekend.
 9. **Profiel genereren/updaten:** schrijf/overschrijf een Dynamic-Profile-JSON
-   `iterm-favicon/<hash(root)>.json` met:
+   `livery/<hash(root)>.json` met:
    - stabiele `Guid` afgeleid van het root-pad (her-bezoek hergebruikt 't profiel);
-   - `Name` (bv. `favicon: <projectnaam>`);
+   - `Name` (bv. `livery: <projectnaam>`);
    - `Custom Icon Path` → absoluut PNG-pad, `Icon` → custom-modus;
    - `Tab Color` + `Use Tab Color`, `Background Color` → de gemute tints
      (berekend voor het huidige thema).
@@ -168,7 +168,7 @@ Naast icoon + kleur krijgt elke themed tab een titel via `OSC 0` (`ESC]0;<titel>
 De store is de **bron van waarheid** (geen wegwerp-cache met mtime-invalidatie).
 Eenmaal gevuld leest `emit` 'm direct en doet géén manifest-scan meer.
 
-- **Locatie:** `~/.config/iterm-favicon/dirs/<hash(root)>.json`, gekoppeld aan
+- **Locatie:** `~/.config/livery/dirs/<hash(root)>.json`, gekoppeld aan
   het absolute project-root-pad. Onzichtbaar in je repo's, werkt ook voor
   niet-git-mappen.
 - **Niveau:** per project-root (omhoog tot `.git`; anders de letterlijke map).
@@ -213,8 +213,8 @@ Verwachte waarden (te bevestigen):
 
 ## Error handling
 
-Alles fail-silent; optioneel een logregel naar `~/.config/iterm-favicon/log` als
-`ITERM_FAVICON_LOG=1`. Concrete gevallen:
+Alles fail-silent; optioneel een logregel naar `~/.config/livery/log` als
+`LIVERY_LOG=1`. Concrete gevallen:
 - Kapotte/ongeldige JSON → skip, reset naar Default.
 - `icons` leeg of geen PNG → skip, reset naar Default.
 - Gerefereerde PNG ontbreekt op schijf → skip icoon, reset naar Default.
@@ -223,7 +223,7 @@ Alles fail-silent; optioneel een logregel naar `~/.config/iterm-favicon/log` als
 
 ## Profiel-opruiming
 
-Commando `iterm-favicon clean`: verwijdert store-entries waarvan het `root`-pad
+Commando `livery clean`: verwijdert store-entries waarvan het `root`-pad
 niet meer bestaat, plus de bijbehorende gegenereerde Dynamic-Profile-bestanden.
 Handmatig, niet automatisch.
 
@@ -231,10 +231,10 @@ Handmatig, niet automatisch.
 
 | Var | Default | Effect |
 |-----|---------|--------|
-| `ITERM_FAVICON_TAB_STRENGTH` | `0.15` | Blend-sterkte tab-kleur |
-| `ITERM_FAVICON_BG_STRENGTH` | `0.07` | Blend-sterkte terminal-achtergrond |
-| `ITERM_FAVICON_MAXDEPTH` | `6` | Max zoekdiepte vanaf project-root |
-| `ITERM_FAVICON_LOG` | (uit) | `1` = logregels naar `~/.config/iterm-favicon/log` |
+| `LIVERY_TAB_STRENGTH` | `0.15` | Blend-sterkte tab-kleur |
+| `LIVERY_BG_STRENGTH` | `0.07` | Blend-sterkte terminal-achtergrond |
+| `LIVERY_MAXDEPTH` | `6` | Max zoekdiepte vanaf project-root |
+| `LIVERY_LOG` | (uit) | `1` = logregels naar `~/.config/livery/log` |
 
 ## Testen (TDD)
 
@@ -272,9 +272,9 @@ controleer dat er output komt en de shell intact blijft).
 ## Projectstructuur
 
 ```
-~/projects/iterm-favicon/
-├── iterm-favicon.zsh        # zsh-hook (source vanuit .zshrc)
-├── iterm_favicon.py         # Python-helper (emit/clean)
+~/projects/livery/
+├── livery.zsh        # zsh-hook (source vanuit .zshrc)
+├── livery.py         # Python-helper (emit/clean)
 ├── tests/                   # pytest + fixture-mappen
 │   └── fixtures/
 ├── docs/superpowers/specs/  # deze spec
@@ -283,5 +283,5 @@ controleer dat er output komt en de shell intact blijft).
 
 Installatie voor de gebruiker: één regel in `~/.zshrc`:
 ```sh
-source ~/projects/iterm-favicon/iterm-favicon.zsh
+source ~/projects/livery/livery.zsh
 ```

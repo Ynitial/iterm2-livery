@@ -1,12 +1,12 @@
 import json
 
-from iterm_favicon.profile import (
+from livery.profile import (
     build_profile, profile_file, profile_guid, profile_name, write_profile,
 )
 
 
 def test_profile_name_uses_root_basename():
-    assert profile_name("/Users/yoni/projects/slowboard") == "favicon: slowboard"
+    assert profile_name("/Users/yoni/projects/slowboard") == "livery: slowboard"
 
 
 def test_guid_stable_per_root():

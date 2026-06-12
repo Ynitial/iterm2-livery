@@ -1,7 +1,7 @@
 import argparse
 import sys
 
-from iterm_favicon import app
+from livery import app
 
 
 def main(argv=None):
@@ -10,7 +10,7 @@ def main(argv=None):
     common.add_argument("--profiles-dir", default=str(app.DEFAULT_PROFILES))
     common.add_argument("--store-dir", default=str(app.DEFAULT_STORE))
 
-    parser = argparse.ArgumentParser(prog="iterm-favicon", parents=[common])
+    parser = argparse.ArgumentParser(prog="livery", parents=[common])
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("emit", parents=[common])
     sub.add_parser("reeval", parents=[common])

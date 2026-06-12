@@ -1,10 +1,10 @@
-# iterm-favicon Implementation Plan
+# livery Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Een zsh-schil rond iTerm2 die per project-root automatisch de favicon (uit `site.webmanifest`) als tab-icoon zet plus een subtiel gemute tint op tab + terminal-achtergrond, opgeslagen in een persistente per-root store.
 
-**Architecture:** Een dunne zsh-laag (`chpwd`/startup hook + `iterm-favicon` commando) roept een Python-pakket aan. Het Python-pakket leest een persistente store als bron van waarheid; alleen bij eerste detectie, `reeval` of `set-icon` doet het de dure afleiding (manifest zoeken → eerste PNG → dominante kleur via `sips`→BMP). Een Dynamic Profile per root draagt het icoon + de kleuren; switchen gebeurt via een `SetProfile`-escape-code.
+**Architecture:** Een dunne zsh-laag (`chpwd`/startup hook + `livery` commando) roept een Python-pakket aan. Het Python-pakket leest een persistente store als bron van waarheid; alleen bij eerste detectie, `reeval` of `set-icon` doet het de dure afleiding (manifest zoeken → eerste PNG → dominante kleur via `sips`→BMP). Een Dynamic Profile per root draagt het icoon + de kleuren; switchen gebeurt via een `SetProfile`-escape-code.
 
 **Tech Stack:** zsh, Python 3 (stdlib only: `json`, `os`, `pathlib`, `struct`, `zlib`, `hashlib`, `subprocess`, `argparse`, `collections`), macOS `sips` + `defaults`, iTerm2 Dynamic Profiles. Tests met `pytest`.
 
@@ -13,9 +13,9 @@
 ## File Structure
 
 ```
-~/projects/iterm-favicon/
-├── iterm-favicon.zsh              # zsh-laag: hook + `iterm-favicon` commando
-├── iterm_favicon/                 # Python-pakket (python3 iterm_favicon <cmd>)
+~/projects/livery/
+├── livery.zsh              # zsh-laag: hook + `livery` commando
+├── livery/                 # Python-pakket (python3 livery <cmd>)
 │   ├── __init__.py
 │   ├── __main__.py                # argparse-dispatch: emit/reeval/set-icon/clean
 │   ├── roots.py                   # find_project_root(cwd)
@@ -79,12 +79,12 @@ Maak `ITERM2-KEYS.md` met de daadwerkelijk waargenomen sleutels en waarden, bijv
 - Achtergrondkleur:  "Background Color": { ... zelfde vorm ... }
 - Dynamic profiles:  bestand = {"Profiles": [ <profiel> ]}, map = ~/Library/Application Support/iTerm2/DynamicProfiles/
 ```
-**Als een sleutel/waarde afwijkt van bovenstaande, pas `iterm_favicon/profile.py` in Taak 9 daarop aan.** Verwijder daarna het `keytest`-profiel.
+**Als een sleutel/waarde afwijkt van bovenstaande, pas `livery/profile.py` in Taak 9 daarop aan.** Verwijder daarna het `keytest`-profiel.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-cd ~/projects/iterm-favicon
+cd ~/projects/livery
 git add ITERM2-KEYS.md
 git commit -m "docs: verified iTerm2 dynamic profile keys"
 ```
@@ -94,13 +94,13 @@ git commit -m "docs: verified iTerm2 dynamic profile keys"
 ## Task 1: Projectopzet + test-harness
 
 **Files:**
-- Create: `iterm_favicon/__init__.py`, `iterm_favicon/__main__.py`, `tests/conftest.py`, `pyproject.toml`
+- Create: `livery/__init__.py`, `livery/__main__.py`, `tests/conftest.py`, `pyproject.toml`
 
 - [ ] **Step 1: Maak een leeg pakket + pytest-config**
 
-Create `iterm_favicon/__init__.py`:
+Create `livery/__init__.py`:
 ```python
-"""iterm-favicon: per-project iTerm2 tab icon + muted color tint."""
+"""livery: per-project iTerm2 tab icon + muted color tint."""
 ```
 
 Create `pyproject.toml`:
@@ -141,13 +141,13 @@ def make_png():
 
 - [ ] **Step 3: Verifieer dat pytest draait (nog 0 tests)**
 
-Run: `cd ~/projects/iterm-favicon && python3 -m pytest -q`
+Run: `cd ~/projects/livery && python3 -m pytest -q`
 Expected: `no tests ran` (exit 5) — pytest werkt, conftest importeert zonder fouten.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add pyproject.toml iterm_favicon/__init__.py tests/conftest.py
+git add pyproject.toml livery/__init__.py tests/conftest.py
 git commit -m "chore: project scaffolding and PNG test fixture"
 ```
 
@@ -156,7 +156,7 @@ git commit -m "chore: project scaffolding and PNG test fixture"
 ## Task 2: Project-root bepalen
 
 **Files:**
-- Create: `iterm_favicon/roots.py`, `tests/test_roots.py`
+- Create: `livery/roots.py`, `tests/test_roots.py`
 
 - [ ] **Step 1: Schrijf de falende test**
 
@@ -164,7 +164,7 @@ Create `tests/test_roots.py`:
 ```python
 from pathlib import Path
 
-from iterm_favicon.roots import find_project_root
+from livery.roots import find_project_root
 
 
 def test_walks_up_to_git_dir(tmp_path):
@@ -183,11 +183,11 @@ def test_falls_back_to_cwd_without_git(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python3 -m pytest tests/test_roots.py -q`
-Expected: FAIL — `ModuleNotFoundError: No module named 'iterm_favicon.roots'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'livery.roots'`
 
 - [ ] **Step 3: Implementeer**
 
-Create `iterm_favicon/roots.py`:
+Create `livery/roots.py`:
 ```python
 from pathlib import Path
 
@@ -209,7 +209,7 @@ Expected: PASS (2 passed)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add iterm_favicon/roots.py tests/test_roots.py
+git add livery/roots.py tests/test_roots.py
 git commit -m "feat: project root resolution via .git walk-up"
 ```
 
@@ -218,7 +218,7 @@ git commit -m "feat: project root resolution via .git walk-up"
 ## Task 3: Manifest zoeken
 
 **Files:**
-- Create: `iterm_favicon/manifest.py`, `tests/test_manifest.py`
+- Create: `livery/manifest.py`, `tests/test_manifest.py`
 
 - [ ] **Step 1: Schrijf de falende test**
 
@@ -226,7 +226,7 @@ Create `tests/test_manifest.py`:
 ```python
 from pathlib import Path
 
-from iterm_favicon.manifest import find_manifest
+from livery.manifest import find_manifest
 
 
 def test_finds_manifest_in_subdir(tmp_path):
@@ -259,11 +259,11 @@ def test_returns_none_when_absent(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python3 -m pytest tests/test_manifest.py -q`
-Expected: FAIL — `ModuleNotFoundError: No module named 'iterm_favicon.manifest'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'livery.manifest'`
 
 - [ ] **Step 3: Implementeer (gedeeltelijk — alleen find_manifest)**
 
-Create `iterm_favicon/manifest.py`:
+Create `livery/manifest.py`:
 ```python
 import os
 from pathlib import Path
@@ -294,7 +294,7 @@ Expected: PASS (4 passed)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add iterm_favicon/manifest.py tests/test_manifest.py
+git add livery/manifest.py tests/test_manifest.py
 git commit -m "feat: recursive site.webmanifest discovery with prune + maxdepth"
 ```
 
@@ -303,14 +303,14 @@ git commit -m "feat: recursive site.webmanifest discovery with prune + maxdepth"
 ## Task 4: Eerste PNG uit het manifest + pad-resolutie
 
 **Files:**
-- Modify: `iterm_favicon/manifest.py`
+- Modify: `livery/manifest.py`
 - Modify: `tests/test_manifest.py`
 
 - [ ] **Step 1: Schrijf de falende test (toevoegen aan bestand)**
 
 Append to `tests/test_manifest.py`:
 ```python
-from iterm_favicon.manifest import first_png
+from livery.manifest import first_png
 
 
 def test_first_png_relative_src(tmp_path):
@@ -350,7 +350,7 @@ Expected: FAIL — `ImportError: cannot import name 'first_png'`
 
 - [ ] **Step 3: Implementeer (toevoegen aan manifest.py)**
 
-Append to `iterm_favicon/manifest.py`:
+Append to `livery/manifest.py`:
 ```python
 import json
 
@@ -382,7 +382,7 @@ Expected: PASS (9 passed)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add iterm_favicon/manifest.py tests/test_manifest.py
+git add livery/manifest.py tests/test_manifest.py
 git commit -m "feat: extract first PNG icon from manifest with path resolution"
 ```
 
@@ -391,7 +391,7 @@ git commit -m "feat: extract first PNG icon from manifest with path resolution"
 ## Task 5: Kleur — BMP lezen, gemiddelde en dominant
 
 **Files:**
-- Create: `iterm_favicon/color.py`, `tests/test_color.py`
+- Create: `livery/color.py`, `tests/test_color.py`
 
 - [ ] **Step 1: Schrijf de falende test (pure functies, geen sips)**
 
@@ -399,7 +399,7 @@ Create `tests/test_color.py`:
 ```python
 import struct
 
-from iterm_favicon.color import average_color, dominant_color, read_bmp
+from livery.color import average_color, dominant_color, read_bmp
 
 
 def _bmp(pixels, w, h):
@@ -442,11 +442,11 @@ def test_dominant_falls_back_to_average_when_all_extreme():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python3 -m pytest tests/test_color.py -q`
-Expected: FAIL — `ModuleNotFoundError: No module named 'iterm_favicon.color'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'livery.color'`
 
 - [ ] **Step 3: Implementeer de pure functies**
 
-Create `iterm_favicon/color.py`:
+Create `livery/color.py`:
 ```python
 import struct
 from collections import Counter
@@ -505,7 +505,7 @@ Expected: PASS (4 passed)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add iterm_favicon/color.py tests/test_color.py
+git add livery/color.py tests/test_color.py
 git commit -m "feat: BMP reader + average and dominant color"
 ```
 
@@ -514,7 +514,7 @@ git commit -m "feat: BMP reader + average and dominant color"
 ## Task 6: Kleur — sips-integratie (PNG → pixels)
 
 **Files:**
-- Modify: `iterm_favicon/color.py`
+- Modify: `livery/color.py`
 - Modify: `tests/test_color.py`
 
 - [ ] **Step 1: Schrijf de falende integratietest (gebruikt echte sips + make_png)**
@@ -525,7 +525,7 @@ import shutil
 
 import pytest
 
-from iterm_favicon.color import sips_pixels, color_from_png
+from livery.color import sips_pixels, color_from_png
 
 
 sips_available = pytest.mark.skipif(shutil.which("sips") is None, reason="sips ontbreekt")
@@ -556,7 +556,7 @@ Expected: FAIL — `ImportError: cannot import name 'sips_pixels'`
 
 - [ ] **Step 3: Implementeer (toevoegen aan color.py)**
 
-Append to `iterm_favicon/color.py`:
+Append to `livery/color.py`:
 ```python
 import os
 import subprocess
@@ -595,7 +595,7 @@ Expected: PASS (6 passed). (Als `sips` niet bestaat: 2 skipped — acceptabel op
 - [ ] **Step 5: Commit**
 
 ```bash
-git add iterm_favicon/color.py tests/test_color.py
+git add livery/color.py tests/test_color.py
 git commit -m "feat: sips-based PNG-to-color pipeline"
 ```
 
@@ -604,13 +604,13 @@ git commit -m "feat: sips-based PNG-to-color pipeline"
 ## Task 7: Thema-detectie + gemute tint
 
 **Files:**
-- Create: `iterm_favicon/tint.py`, `tests/test_tint.py`
+- Create: `livery/tint.py`, `tests/test_tint.py`
 
 - [ ] **Step 1: Schrijf de falende test**
 
 Create `tests/test_tint.py`:
 ```python
-from iterm_favicon.tint import mute
+from livery.tint import mute
 
 
 def test_mute_dark_blends_to_black():
@@ -630,11 +630,11 @@ def test_mute_full_strength_is_color():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python3 -m pytest tests/test_tint.py -q`
-Expected: FAIL — `ModuleNotFoundError: No module named 'iterm_favicon.tint'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'livery.tint'`
 
 - [ ] **Step 3: Implementeer**
 
-Create `iterm_favicon/tint.py`:
+Create `livery/tint.py`:
 ```python
 import subprocess
 
@@ -665,7 +665,7 @@ Expected: PASS (3 passed)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add iterm_favicon/tint.py tests/test_tint.py
+git add livery/tint.py tests/test_tint.py
 git commit -m "feat: macOS theme detection + muted tint blend"
 ```
 
@@ -674,13 +674,13 @@ git commit -m "feat: macOS theme detection + muted tint blend"
 ## Task 8: Per-root store
 
 **Files:**
-- Create: `iterm_favicon/store.py`, `tests/test_store.py`
+- Create: `livery/store.py`, `tests/test_store.py`
 
 - [ ] **Step 1: Schrijf de falende test**
 
 Create `tests/test_store.py`:
 ```python
-from iterm_favicon.store import iter_entries, read_entry, store_path, write_entry
+from livery.store import iter_entries, read_entry, store_path, write_entry
 
 
 def test_write_then_read(tmp_path):
@@ -709,11 +709,11 @@ def test_iter_entries(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python3 -m pytest tests/test_store.py -q`
-Expected: FAIL — `ModuleNotFoundError: No module named 'iterm_favicon.store'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'livery.store'`
 
 - [ ] **Step 3: Implementeer**
 
-Create `iterm_favicon/store.py`:
+Create `livery/store.py`:
 ```python
 import hashlib
 import json
@@ -762,7 +762,7 @@ Expected: PASS (4 passed)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add iterm_favicon/store.py tests/test_store.py
+git add livery/store.py tests/test_store.py
 git commit -m "feat: persistent per-root store"
 ```
 
@@ -771,7 +771,7 @@ git commit -m "feat: persistent per-root store"
 ## Task 9: Dynamic Profile-generatie
 
 **Files:**
-- Create: `iterm_favicon/profile.py`, `tests/test_profile.py`
+- Create: `livery/profile.py`, `tests/test_profile.py`
 
 > Gebruik de in **Taak 0** bevestigde sleutels. Onderstaande code gaat uit van
 > `"Icon": 2` + `"Custom Icon Path"`; pas aan als Taak 0 afweek.
@@ -782,13 +782,13 @@ Create `tests/test_profile.py`:
 ```python
 import json
 
-from iterm_favicon.profile import (
+from livery.profile import (
     build_profile, profile_file, profile_guid, profile_name, write_profile,
 )
 
 
 def test_profile_name_uses_root_basename():
-    assert profile_name("/Users/yoni/projects/slowboard") == "favicon: slowboard"
+    assert profile_name("/Users/yoni/projects/slowboard") == "livery: slowboard"
 
 
 def test_guid_stable_per_root():
@@ -816,11 +816,11 @@ def test_write_profile_wraps_in_profiles_array(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python3 -m pytest tests/test_profile.py -q`
-Expected: FAIL — `ModuleNotFoundError: No module named 'iterm_favicon.profile'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'livery.profile'`
 
 - [ ] **Step 3: Implementeer**
 
-Create `iterm_favicon/profile.py`:
+Create `livery/profile.py`:
 ```python
 import hashlib
 import json
@@ -828,11 +828,11 @@ from pathlib import Path
 
 
 def profile_guid(root):
-    return "iterm-favicon-" + hashlib.sha1(str(root).encode()).hexdigest()[:16]
+    return "livery-" + hashlib.sha1(str(root).encode()).hexdigest()[:16]
 
 
 def profile_name(root):
-    return f"favicon: {Path(root).name}"
+    return f"livery: {Path(root).name}"
 
 
 def profile_file(profiles_dir, root):
@@ -875,7 +875,7 @@ Expected: PASS (4 passed)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add iterm_favicon/profile.py tests/test_profile.py
+git add livery/profile.py tests/test_profile.py
 git commit -m "feat: iTerm2 dynamic profile generation"
 ```
 
@@ -884,17 +884,17 @@ git commit -m "feat: iTerm2 dynamic profile generation"
 ## Task 10: Escape-sequences
 
 **Files:**
-- Create: `iterm_favicon/escapes.py`, `tests/test_escapes.py`
+- Create: `livery/escapes.py`, `tests/test_escapes.py`
 
 - [ ] **Step 1: Schrijf de falende test**
 
 Create `tests/test_escapes.py`:
 ```python
-from iterm_favicon.escapes import set_profile, tab_color, reset
+from livery.escapes import set_profile, tab_color, reset
 
 
 def test_set_profile():
-    assert set_profile("favicon: x") == "\033]1337;SetProfile=favicon: x\007"
+    assert set_profile("livery: x") == "\033]1337;SetProfile=livery: x\007"
 
 
 def test_tab_color_three_channels():
@@ -911,11 +911,11 @@ def test_reset_switches_to_default_and_clears_color():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python3 -m pytest tests/test_escapes.py -q`
-Expected: FAIL — `ModuleNotFoundError: No module named 'iterm_favicon.escapes'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'livery.escapes'`
 
 - [ ] **Step 3: Implementeer**
 
-Create `iterm_favicon/escapes.py`:
+Create `livery/escapes.py`:
 ```python
 ESC = "\033"
 BEL = "\007"
@@ -944,7 +944,7 @@ Expected: PASS (3 passed)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add iterm_favicon/escapes.py tests/test_escapes.py
+git add livery/escapes.py tests/test_escapes.py
 git commit -m "feat: OSC escape sequences for profile + tab color"
 ```
 
@@ -953,7 +953,7 @@ git commit -m "feat: OSC escape sequences for profile + tab color"
 ## Task 11: Orchestratie — `emit`
 
 **Files:**
-- Create: `iterm_favicon/app.py`, `tests/test_app.py`
+- Create: `livery/app.py`, `tests/test_app.py`
 
 `app.py` knoopt alle modules samen. Strengtes komen uit env-vars met defaults.
 
@@ -961,8 +961,8 @@ git commit -m "feat: OSC escape sequences for profile + tab color"
 
 Create `tests/test_app.py`:
 ```python
-from iterm_favicon import app, store
-from iterm_favicon.profile import profile_file
+from livery import app, store
+from livery.profile import profile_file
 
 
 def _dirs(tmp_path):
@@ -984,7 +984,7 @@ def test_emit_detects_and_caches(tmp_path, make_png, monkeypatch):
 
     out = app.cmd_emit(cwd=tmp_path, **d)
 
-    assert "SetProfile=favicon:" in out
+    assert "SetProfile=livery:" in out
     entry = store.read_entry(d["store_dir"], tmp_path.resolve())
     assert entry["dominant_color"] == [40, 80, 200]
     assert entry["source"] == "manifest"
@@ -1006,7 +1006,7 @@ def test_emit_uses_store_without_rescanning(tmp_path, make_png, monkeypatch):
 
     monkeypatch.setattr(app, "color_from_png", boom)
     out = app.cmd_emit(cwd=tmp_path, **d)
-    assert "SetProfile=favicon:" in out
+    assert "SetProfile=livery:" in out
 
 
 def test_emit_missing_icon_file_resets(tmp_path, monkeypatch):
@@ -1023,36 +1023,36 @@ def test_emit_missing_icon_file_resets(tmp_path, monkeypatch):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python3 -m pytest tests/test_app.py -q`
-Expected: FAIL — `ModuleNotFoundError: No module named 'iterm_favicon.app'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'livery.app'`
 
 - [ ] **Step 3: Implementeer `app.py` (emit + helpers)**
 
-Create `iterm_favicon/app.py`:
+Create `livery/app.py`:
 ```python
 import os
 from pathlib import Path
 
-from iterm_favicon import escapes, store
-from iterm_favicon.color import color_from_png
-from iterm_favicon.manifest import find_manifest, first_png
-from iterm_favicon.profile import build_profile, profile_file, profile_name, write_profile
-from iterm_favicon.roots import find_project_root
-from iterm_favicon.tint import detect_theme, mute
+from livery import escapes, store
+from livery.color import color_from_png
+from livery.manifest import find_manifest, first_png
+from livery.profile import build_profile, profile_file, profile_name, write_profile
+from livery.roots import find_project_root
+from livery.tint import detect_theme, mute
 
-DEFAULT_STORE = Path.home() / ".config" / "iterm-favicon" / "dirs"
+DEFAULT_STORE = Path.home() / ".config" / "livery" / "dirs"
 DEFAULT_PROFILES = Path.home() / "Library" / "Application Support" / "iTerm2" / "DynamicProfiles"
 
 
 def _tab_strength():
-    return float(os.environ.get("ITERM_FAVICON_TAB_STRENGTH", "0.15"))
+    return float(os.environ.get("LIVERY_TAB_STRENGTH", "0.15"))
 
 
 def _bg_strength():
-    return float(os.environ.get("ITERM_FAVICON_BG_STRENGTH", "0.07"))
+    return float(os.environ.get("LIVERY_BG_STRENGTH", "0.07"))
 
 
 def _maxdepth():
-    return int(os.environ.get("ITERM_FAVICON_MAXDEPTH", "6"))
+    return int(os.environ.get("LIVERY_MAXDEPTH", "6"))
 
 
 def _ensure_profile(profiles_dir, root, icon_path, rgb, theme):
@@ -1113,7 +1113,7 @@ Expected: PASS (4 passed)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add iterm_favicon/app.py tests/test_app.py
+git add livery/app.py tests/test_app.py
 git commit -m "feat: emit orchestration with store fast-path"
 ```
 
@@ -1122,8 +1122,8 @@ git commit -m "feat: emit orchestration with store fast-path"
 ## Task 12: `reeval`, `set-icon`, `clean`
 
 **Files:**
-- Modify: `iterm_favicon/app.py`
-- Modify: `iterm_favicon/store.py`
+- Modify: `livery/app.py`
+- Modify: `livery/store.py`
 - Modify: `tests/test_app.py`
 
 - [ ] **Step 1: Schrijf de falende test (toevoegen)**
@@ -1175,11 +1175,11 @@ def test_clean_removes_orphan_entries(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python3 -m pytest tests/test_app.py -q`
-Expected: FAIL — `AttributeError: module 'iterm_favicon.app' has no attribute 'cmd_reeval'`
+Expected: FAIL — `AttributeError: module 'livery.app' has no attribute 'cmd_reeval'`
 
 - [ ] **Step 3: Voeg een delete-helper toe aan de store**
 
-Append to `iterm_favicon/store.py`:
+Append to `livery/store.py`:
 ```python
 def delete_entry(store_dir, root):
     p = store_path(store_dir, root)
@@ -1189,9 +1189,9 @@ def delete_entry(store_dir, root):
 
 - [ ] **Step 4: Implementeer de commando's (toevoegen aan app.py)**
 
-Append to `iterm_favicon/app.py`:
+Append to `livery/app.py`:
 ```python
-from iterm_favicon.profile import profile_guid
+from livery.profile import profile_guid
 
 
 def cmd_reeval(cwd, profiles_dir, store_dir):
@@ -1247,7 +1247,7 @@ Expected: PASS (7 passed)
 - [ ] **Step 6: Commit**
 
 ```bash
-git add iterm_favicon/app.py iterm_favicon/store.py tests/test_app.py
+git add livery/app.py livery/store.py tests/test_app.py
 git commit -m "feat: reeval, set-icon and clean commands"
 ```
 
@@ -1256,7 +1256,7 @@ git commit -m "feat: reeval, set-icon and clean commands"
 ## Task 13: CLI-dispatch (`__main__.py`)
 
 **Files:**
-- Create: `iterm_favicon/__main__.py`
+- Create: `livery/__main__.py`
 - Modify: `tests/test_app.py`
 
 - [ ] **Step 1: Schrijf de falende test (subprocess-aanroep van het pakket)**
@@ -1272,7 +1272,7 @@ def test_cli_emit_no_manifest_prints_reset(tmp_path, monkeypatch):
     repo = Path(__file__).resolve().parent.parent
     env = dict(**os.environ)
     proc = subprocess.run(
-        [sys.executable, "-m", "iterm_favicon", "emit",
+        [sys.executable, "-m", "livery", "emit",
          "--cwd", str(tmp_path),
          "--profiles-dir", str(tmp_path / "p"),
          "--store-dir", str(tmp_path / "s")],
@@ -1286,20 +1286,20 @@ def test_cli_emit_no_manifest_prints_reset(tmp_path, monkeypatch):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python3 -m pytest tests/test_app.py::test_cli_emit_no_manifest_prints_reset -q`
-Expected: FAIL — `No module named iterm_favicon.__main__` / non-zero returncode
+Expected: FAIL — `No module named livery.__main__` / non-zero returncode
 
 - [ ] **Step 3: Implementeer de dispatch**
 
-Create `iterm_favicon/__main__.py`:
+Create `livery/__main__.py`:
 ```python
 import argparse
 import sys
 
-from iterm_favicon import app
+from livery import app
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(prog="iterm-favicon")
+    parser = argparse.ArgumentParser(prog="livery")
     parser.add_argument("--cwd", default=".")
     parser.add_argument("--profiles-dir", default=str(app.DEFAULT_PROFILES))
     parser.add_argument("--store-dir", default=str(app.DEFAULT_STORE))
@@ -1337,7 +1337,7 @@ Expected: PASS (8 passed)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add iterm_favicon/__main__.py tests/test_app.py
+git add livery/__main__.py tests/test_app.py
 git commit -m "feat: argparse CLI dispatch"
 ```
 
@@ -1346,37 +1346,37 @@ git commit -m "feat: argparse CLI dispatch"
 ## Task 14: zsh-laag
 
 **Files:**
-- Create: `iterm-favicon.zsh`
+- Create: `livery.zsh`
 
 - [ ] **Step 1: Schrijf de zsh-laag**
 
-Create `iterm-favicon.zsh`:
+Create `livery.zsh`:
 ```zsh
-# iterm-favicon — source dit vanuit ~/.zshrc
-ITERM_FAVICON_DIR="${0:A:h}"
+# livery — source dit vanuit ~/.zshrc
+LIVERY_DIR="${0:A:h}"
 
-_iterm_favicon_run() {
+_livery_run() {
   [[ "$TERM_PROGRAM" == "iTerm.app" ]] || return 0
   local logfile="/dev/null"
-  [[ -n "$ITERM_FAVICON_LOG" ]] && logfile="$HOME/.config/iterm-favicon/log"
+  [[ -n "$LIVERY_LOG" ]] && logfile="$HOME/.config/livery/log"
   local out
-  out="$(python3 "$ITERM_FAVICON_DIR/iterm_favicon" emit --cwd "$PWD" 2>>"$logfile")" || return 0
+  out="$(python3 "$LIVERY_DIR/livery" emit --cwd "$PWD" 2>>"$logfile")" || return 0
   print -rn -- "$out"
 }
 
-iterm-favicon() {
-  [[ "$TERM_PROGRAM" == "iTerm.app" ]] || { echo "iterm-favicon: alleen in iTerm2"; return 1; }
+livery() {
+  [[ "$TERM_PROGRAM" == "iTerm.app" ]] || { echo "livery: alleen in iTerm2"; return 1; }
   case "$1" in
-    reeval)   python3 "$ITERM_FAVICON_DIR/iterm_favicon" reeval --cwd "$PWD" ;;
-    set-icon) python3 "$ITERM_FAVICON_DIR/iterm_favicon" set-icon "$2" --cwd "$PWD" ;;
-    clean)    python3 "$ITERM_FAVICON_DIR/iterm_favicon" clean ;;
-    *) echo "usage: iterm-favicon {reeval|set-icon <pad>|clean}"; return 1 ;;
+    reeval)   python3 "$LIVERY_DIR/livery" reeval --cwd "$PWD" ;;
+    set-icon) python3 "$LIVERY_DIR/livery" set-icon "$2" --cwd "$PWD" ;;
+    clean)    python3 "$LIVERY_DIR/livery" clean ;;
+    *) echo "usage: livery {reeval|set-icon <pad>|clean}"; return 1 ;;
   esac
 }
 
 autoload -U add-zsh-hook
-add-zsh-hook chpwd _iterm_favicon_run
-_iterm_favicon_run   # bij startup
+add-zsh-hook chpwd _livery_run
+_livery_run   # bij startup
 ```
 
 > Noot: `reeval`/`set-icon` printen zelf de escape-sequences (ze retourneren die
@@ -1384,19 +1384,19 @@ _iterm_favicon_run   # bij startup
 
 - [ ] **Step 2: Smoke-test de syntaxis**
 
-Run: `zsh -n iterm-favicon.zsh && echo OK`
+Run: `zsh -n livery.zsh && echo OK`
 Expected: `OK` (geen syntaxisfouten)
 
 - [ ] **Step 3: Smoke-test sourcen + functie bestaat**
 
-Run: `zsh -c 'source ./iterm-favicon.zsh; type _iterm_favicon_run >/dev/null && type iterm-favicon >/dev/null && echo OK'`
+Run: `zsh -c 'source ./livery.zsh; type _livery_run >/dev/null && type livery >/dev/null && echo OK'`
 Expected: `OK`
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add iterm-favicon.zsh
-git commit -m "feat: zsh hook layer with chpwd + iterm-favicon command"
+git add livery.zsh
+git commit -m "feat: zsh hook layer with chpwd + livery command"
 ```
 
 ---
@@ -1410,7 +1410,7 @@ git commit -m "feat: zsh hook layer with chpwd + iterm-favicon command"
 
 Create `README.md`:
 ```markdown
-# iterm-favicon
+# livery
 
 Geeft elke iTerm2-tab automatisch het icoon + de (gemute) merkkleur van het
 project waarin je staat, op basis van `site.webmanifest`.
@@ -1420,29 +1420,29 @@ project waarin je staat, op basis van `site.webmanifest`.
 1. iTerm2 vereist: `brew install --cask iterm2`
 2. Voeg aan `~/.zshrc` toe:
    ```sh
-   source ~/projects/iterm-favicon/iterm-favicon.zsh
+   source ~/projects/livery/livery.zsh
    ```
 3. Open een nieuwe iTerm2-tab.
 
 ## Commando's
 
-- `iterm-favicon reeval` — opnieuw afleiden uit `site.webmanifest`.
-- `iterm-favicon set-icon <pad>` — handmatig icoon-pad instellen (ook zonder manifest).
-- `iterm-favicon clean` — verweesde profielen/store-entries opruimen.
+- `livery reeval` — opnieuw afleiden uit `site.webmanifest`.
+- `livery set-icon <pad>` — handmatig icoon-pad instellen (ook zonder manifest).
+- `livery clean` — verweesde profielen/store-entries opruimen.
 
 ## Configuratie (env-vars)
 
 | Var | Default | Effect |
 |-----|---------|--------|
-| `ITERM_FAVICON_TAB_STRENGTH` | `0.15` | Blend-sterkte tab-kleur |
-| `ITERM_FAVICON_BG_STRENGTH` | `0.07` | Blend-sterkte terminal-achtergrond |
-| `ITERM_FAVICON_MAXDEPTH` | `6` | Max zoekdiepte vanaf project-root |
-| `ITERM_FAVICON_LOG` | (uit) | `1` = logregels naar `~/.config/iterm-favicon/log` |
+| `LIVERY_TAB_STRENGTH` | `0.15` | Blend-sterkte tab-kleur |
+| `LIVERY_BG_STRENGTH` | `0.07` | Blend-sterkte terminal-achtergrond |
+| `LIVERY_MAXDEPTH` | `6` | Max zoekdiepte vanaf project-root |
+| `LIVERY_LOG` | (uit) | `1` = logregels naar `~/.config/livery/log` |
 
 ## Werking
 
 Per project-root (omhoog tot `.git`) wordt één keer de favicon + dominante kleur
-afgeleid en opgeslagen in `~/.config/iterm-favicon/dirs/`. Daarna leest elke `cd`
+afgeleid en opgeslagen in `~/.config/livery/dirs/`. Daarna leest elke `cd`
 puur die store. Een Dynamic Profile in iTerm2 draagt het icoon + de kleuren.
 ```
 
@@ -1461,7 +1461,7 @@ git commit -m "docs: README with install and usage"
 
 - [ ] **Step 1: Draai de volledige suite**
 
-Run: `cd ~/projects/iterm-favicon && python3 -m pytest -q`
+Run: `cd ~/projects/livery && python3 -m pytest -q`
 Expected: alle tests PASS (sips-tests passen op macOS; anders skipped).
 
 - [ ] **Step 2: Activeer in je echte shell**
@@ -1476,7 +1476,7 @@ cd ~/pad/naar/webproject
 ```
 Expected: de tab krijgt het favicon-icoon + een subtiele tint; controleer
 `ls ~/Library/Application\ Support/iTerm2/DynamicProfiles/` en
-`ls ~/.config/iterm-favicon/dirs/` (elk één bestand).
+`ls ~/.config/livery/dirs/` (elk één bestand).
 
 - [ ] **Step 4: Test reset + commando's**
 
@@ -1484,15 +1484,15 @@ Run:
 ```bash
 cd /tmp                 # geen manifest -> terug naar Default-look
 cd -                    # weer het project -> snelpad uit store
-iterm-favicon set-icon ~/pad/naar/eigen-logo.png   # handmatig icoon
-iterm-favicon reeval                                # weer uit manifest
+livery set-icon ~/pad/naar/eigen-logo.png   # handmatig icoon
+livery reeval                                # weer uit manifest
 ```
 Expected: tab volgt elke keer; `set-icon` toont jouw logo; `reeval` herstelt het manifest-icoon.
 
 - [ ] **Step 5 (indien nodig): stem de sterktes af**
 
-Vind je de tint te sterk/zwak: zet bijv. `export ITERM_FAVICON_TAB_STRENGTH=0.10`
-in `~/.zshrc`, open een nieuwe tab, `iterm-favicon reeval`.
+Vind je de tint te sterk/zwak: zet bijv. `export LIVERY_TAB_STRENGTH=0.10`
+in `~/.zshrc`, open een nieuwe tab, `livery reeval`.
 
 - [ ] **Step 6: Commit eventuele bevindingen**
 
@@ -1524,17 +1524,17 @@ git add -A && git commit -m "chore: tune defaults after end-to-end check"
 
 ## Task 10 (REVISED): Escape-sequences (incl. titel + losse resets)
 
-**Files:** Create `iterm_favicon/escapes.py`, `tests/test_escapes.py`
+**Files:** Create `livery/escapes.py`, `tests/test_escapes.py`
 
 - [ ] **Step 1: failing test** — Create `tests/test_escapes.py`:
 ```python
-from iterm_favicon.escapes import (
+from livery.escapes import (
     default_look, reset, reset_tab_color, set_profile, tab_color, title,
 )
 
 
 def test_set_profile():
-    assert set_profile("favicon: x") == "\033]1337;SetProfile=favicon: x\007"
+    assert set_profile("livery: x") == "\033]1337;SetProfile=livery: x\007"
 
 
 def test_tab_color_three_channels():
@@ -1559,9 +1559,9 @@ def test_reset_clears_title_then_default_look():
     assert reset() == "\033]0;\007\033]1337;SetProfile=Default\007\033]6;1;bg;*;default\007"
 ```
 
-- [ ] **Step 2: verify fail** — `python3 -m pytest tests/test_escapes.py -q` → FAIL (No module named 'iterm_favicon.escapes').
+- [ ] **Step 2: verify fail** — `python3 -m pytest tests/test_escapes.py -q` → FAIL (No module named 'livery.escapes').
 
-- [ ] **Step 3: implement** — Create `iterm_favicon/escapes.py`:
+- [ ] **Step 3: implement** — Create `livery/escapes.py`:
 ```python
 ESC = "\033"
 BEL = "\007"
@@ -1600,17 +1600,17 @@ def reset():
 
 - [ ] **Step 5: commit**
 ```bash
-git add iterm_favicon/escapes.py tests/test_escapes.py
+git add livery/escapes.py tests/test_escapes.py
 git commit -m "feat: OSC escapes for profile, tab color and title"
 ```
 
 ## Task 10b (NEW): Titel-afleiding
 
-**Files:** Create `iterm_favicon/title.py`, `tests/test_title.py`
+**Files:** Create `livery/title.py`, `tests/test_title.py`
 
 - [ ] **Step 1: failing test** — Create `tests/test_title.py`:
 ```python
-from iterm_favicon.title import base_name, name_from_env, name_from_manifest, tab_title
+from livery.title import base_name, name_from_env, name_from_manifest, tab_title
 
 
 def test_name_from_manifest_prefers_name(tmp_path):
@@ -1664,9 +1664,9 @@ def test_tab_title_with_and_without_custom():
     assert tab_title("Slowboard", "") == "Slowboard"
 ```
 
-- [ ] **Step 2: verify fail** — `python3 -m pytest tests/test_title.py -q` → FAIL (No module named 'iterm_favicon.title').
+- [ ] **Step 2: verify fail** — `python3 -m pytest tests/test_title.py -q` → FAIL (No module named 'livery.title').
 
-- [ ] **Step 3: implement** — Create `iterm_favicon/title.py`:
+- [ ] **Step 3: implement** — Create `livery/title.py`:
 ```python
 import json
 from pathlib import Path
@@ -1723,20 +1723,20 @@ def tab_title(base, custom=None):
 
 - [ ] **Step 5: commit**
 ```bash
-git add iterm_favicon/title.py tests/test_title.py
+git add livery/title.py tests/test_title.py
 git commit -m "feat: tab title name derivation (manifest -> .env -> dirname)"
 ```
 
 ## Task 11 (REVISED): Orchestratie — `emit` (titel + env-only theming)
 
-**Files:** Create `iterm_favicon/app.py`, `tests/test_app.py`
+**Files:** Create `livery/app.py`, `tests/test_app.py`
 
 - [ ] **Step 1: failing test** — Create `tests/test_app.py`:
 ```python
 import os
 
-from iterm_favicon import app, escapes, store
-from iterm_favicon.profile import profile_file
+from livery import app, escapes, store
+from livery.profile import profile_file
 
 
 def _dirs(tmp_path):
@@ -1759,7 +1759,7 @@ def test_emit_manifest_sets_icon_color_and_title(tmp_path, make_png, monkeypatch
     out = app.cmd_emit(cwd=tmp_path, **d)
 
     assert "]0;Slowboard\007" in out
-    assert "SetProfile=favicon:" in out
+    assert "SetProfile=livery:" in out
     entry = store.read_entry(d["store_dir"], tmp_path.resolve())
     assert entry["dominant_color"] == [40, 80, 200]
     assert entry["name"] == "Slowboard"
@@ -1799,7 +1799,7 @@ def test_emit_uses_store_without_rescanning(tmp_path, make_png, monkeypatch):
     monkeypatch.setattr(app, "color_from_png", boom)
     out = app.cmd_emit(cwd=tmp_path, **d)
     assert "]0;Cached\007" in out
-    assert "SetProfile=favicon:" in out
+    assert "SetProfile=livery:" in out
 
 
 def test_emit_missing_icon_file_resets(tmp_path, monkeypatch):
@@ -1814,35 +1814,35 @@ def test_emit_missing_icon_file_resets(tmp_path, monkeypatch):
     assert out == escapes.reset()
 ```
 
-- [ ] **Step 2: verify fail** — `python3 -m pytest tests/test_app.py -q` → FAIL (No module named 'iterm_favicon.app').
+- [ ] **Step 2: verify fail** — `python3 -m pytest tests/test_app.py -q` → FAIL (No module named 'livery.app').
 
-- [ ] **Step 3: implement** — Create `iterm_favicon/app.py`:
+- [ ] **Step 3: implement** — Create `livery/app.py`:
 ```python
 import os
 from pathlib import Path
 
-from iterm_favicon import escapes, store
-from iterm_favicon.color import color_from_png
-from iterm_favicon.manifest import find_manifest, first_png
-from iterm_favicon.profile import build_profile, profile_file, profile_name, write_profile
-from iterm_favicon.roots import find_project_root
-from iterm_favicon.tint import detect_theme, mute
-from iterm_favicon.title import base_name, tab_title
+from livery import escapes, store
+from livery.color import color_from_png
+from livery.manifest import find_manifest, first_png
+from livery.profile import build_profile, profile_file, profile_name, write_profile
+from livery.roots import find_project_root
+from livery.tint import detect_theme, mute
+from livery.title import base_name, tab_title
 
-DEFAULT_STORE = Path.home() / ".config" / "iterm-favicon" / "dirs"
+DEFAULT_STORE = Path.home() / ".config" / "livery" / "dirs"
 DEFAULT_PROFILES = Path.home() / "Library" / "Application Support" / "iTerm2" / "DynamicProfiles"
 
 
 def _tab_strength():
-    return float(os.environ.get("ITERM_FAVICON_TAB_STRENGTH", "0.15"))
+    return float(os.environ.get("LIVERY_TAB_STRENGTH", "0.15"))
 
 
 def _bg_strength():
-    return float(os.environ.get("ITERM_FAVICON_BG_STRENGTH", "0.07"))
+    return float(os.environ.get("LIVERY_BG_STRENGTH", "0.07"))
 
 
 def _maxdepth():
-    return int(os.environ.get("ITERM_FAVICON_MAXDEPTH", "6"))
+    return int(os.environ.get("LIVERY_MAXDEPTH", "6"))
 
 
 def _detect(root, force=False):
@@ -1918,13 +1918,13 @@ def cmd_emit(cwd, profiles_dir, store_dir):
 
 - [ ] **Step 5: commit**
 ```bash
-git add iterm_favicon/app.py tests/test_app.py
+git add livery/app.py tests/test_app.py
 git commit -m "feat: emit orchestration with title + env-only theming"
 ```
 
 ## Task 12 (REVISED): `reeval`, `set-icon`, `rename`, `clean`
 
-**Files:** Modify `iterm_favicon/app.py`, `iterm_favicon/store.py`, `tests/test_app.py`
+**Files:** Modify `livery/app.py`, `livery/store.py`, `tests/test_app.py`
 
 - [ ] **Step 1: failing test** — APPEND to `tests/test_app.py`:
 ```python
@@ -1996,9 +1996,9 @@ def test_clean_removes_orphan_entries(tmp_path):
     assert store.read_entry(d["store_dir"], alive.resolve()) is not None
 ```
 
-- [ ] **Step 2: verify fail** — `python3 -m pytest tests/test_app.py -q` → FAIL (AttributeError: module 'iterm_favicon.app' has no attribute 'cmd_reeval').
+- [ ] **Step 2: verify fail** — `python3 -m pytest tests/test_app.py -q` → FAIL (AttributeError: module 'livery.app' has no attribute 'cmd_reeval').
 
-- [ ] **Step 3: store delete helper** — APPEND to `iterm_favicon/store.py`:
+- [ ] **Step 3: store delete helper** — APPEND to `livery/store.py`:
 ```python
 def delete_entry(store_dir, root):
     p = store_path(store_dir, root)
@@ -2006,9 +2006,9 @@ def delete_entry(store_dir, root):
         p.unlink()
 ```
 
-- [ ] **Step 4: implement** — APPEND to `iterm_favicon/app.py`:
+- [ ] **Step 4: implement** — APPEND to `livery/app.py`:
 ```python
-from iterm_favicon.profile import profile_guid
+from livery.profile import profile_guid
 
 
 def cmd_reeval(cwd, profiles_dir, store_dir):
@@ -2073,13 +2073,13 @@ def cmd_clean(profiles_dir, store_dir):
 
 - [ ] **Step 6: commit**
 ```bash
-git add iterm_favicon/app.py iterm_favicon/store.py tests/test_app.py
+git add livery/app.py livery/store.py tests/test_app.py
 git commit -m "feat: reeval, set-icon, rename and clean commands"
 ```
 
 ## Task 13 (REVISED): CLI-dispatch (incl. `rename`)
 
-**Files:** Create `iterm_favicon/__main__.py`, modify `tests/test_app.py`
+**Files:** Create `livery/__main__.py`, modify `tests/test_app.py`
 
 - [ ] **Step 1: failing test** — APPEND to `tests/test_app.py`:
 ```python
@@ -2091,7 +2091,7 @@ from pathlib import Path
 def test_cli_emit_not_a_project_prints_reset(tmp_path):
     repo = Path(__file__).resolve().parent.parent
     proc = subprocess.run(
-        [sys.executable, "-m", "iterm_favicon", "emit",
+        [sys.executable, "-m", "livery", "emit",
          "--cwd", str(tmp_path),
          "--profiles-dir", str(tmp_path / "p"),
          "--store-dir", str(tmp_path / "s")],
@@ -2105,7 +2105,7 @@ def test_cli_rename_prints_title(tmp_path):
     repo = Path(__file__).resolve().parent.parent
     (tmp_path / ".env").write_text("APP_NAME=EnvApp\n")
     proc = subprocess.run(
-        [sys.executable, "-m", "iterm_favicon", "rename", "dev",
+        [sys.executable, "-m", "livery", "rename", "dev",
          "--cwd", str(tmp_path),
          "--profiles-dir", str(tmp_path / "p"),
          "--store-dir", str(tmp_path / "s")],
@@ -2115,18 +2115,18 @@ def test_cli_rename_prints_title(tmp_path):
     assert "]0;EnvApp | dev\007" in proc.stdout
 ```
 
-- [ ] **Step 2: verify fail** — `python3 -m pytest tests/test_app.py -k cli -q` → FAIL (No module named iterm_favicon.__main__ / non-zero returncode).
+- [ ] **Step 2: verify fail** — `python3 -m pytest tests/test_app.py -k cli -q` → FAIL (No module named livery.__main__ / non-zero returncode).
 
-- [ ] **Step 3: implement** — Create `iterm_favicon/__main__.py`:
+- [ ] **Step 3: implement** — Create `livery/__main__.py`:
 ```python
 import argparse
 import sys
 
-from iterm_favicon import app
+from livery import app
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(prog="iterm-favicon")
+    parser = argparse.ArgumentParser(prog="livery")
     parser.add_argument("--cwd", default=".")
     parser.add_argument("--profiles-dir", default=str(app.DEFAULT_PROFILES))
     parser.add_argument("--store-dir", default=str(app.DEFAULT_STORE))
@@ -2164,70 +2164,70 @@ if __name__ == "__main__":
 
 - [ ] **Step 5: commit**
 ```bash
-git add iterm_favicon/__main__.py tests/test_app.py
+git add livery/__main__.py tests/test_app.py
 git commit -m "feat: argparse CLI dispatch with rename"
 ```
 
 ## Task 14 (REVISED): zsh-laag (PYTHONPATH/-m + rename)
 
-**Files:** Create `iterm-favicon.zsh`
+**Files:** Create `livery.zsh`
 
-- [ ] **Step 1: implement** — Create `iterm-favicon.zsh`:
+- [ ] **Step 1: implement** — Create `livery.zsh`:
 ```zsh
-# iterm-favicon — source dit vanuit ~/.zshrc
-ITERM_FAVICON_DIR="${0:A:h}"
+# livery — source dit vanuit ~/.zshrc
+LIVERY_DIR="${0:A:h}"
 
-_iterm_favicon_py() {
-  # Draai het pakket met de repo-root op PYTHONPATH zodat `import iterm_favicon` werkt.
-  PYTHONPATH="$ITERM_FAVICON_DIR" python3 -m iterm_favicon "$@"
+_livery_py() {
+  # Draai het pakket met de repo-root op PYTHONPATH zodat `import livery` werkt.
+  PYTHONPATH="$LIVERY_DIR" python3 -m livery "$@"
 }
 
-_iterm_favicon_run() {
+_livery_run() {
   [[ "$TERM_PROGRAM" == "iTerm.app" ]] || return 0
   local logfile="/dev/null"
-  [[ -n "$ITERM_FAVICON_LOG" ]] && logfile="$HOME/.config/iterm-favicon/log"
+  [[ -n "$LIVERY_LOG" ]] && logfile="$HOME/.config/livery/log"
   local out
-  out="$(_iterm_favicon_py emit --cwd "$PWD" 2>>"$logfile")" || return 0
+  out="$(_livery_py emit --cwd "$PWD" 2>>"$logfile")" || return 0
   print -rn -- "$out"
 }
 
-iterm-favicon() {
-  [[ "$TERM_PROGRAM" == "iTerm.app" ]] || { echo "iterm-favicon: alleen in iTerm2"; return 1; }
+livery() {
+  [[ "$TERM_PROGRAM" == "iTerm.app" ]] || { echo "livery: alleen in iTerm2"; return 1; }
   local out
   case "$1" in
-    reeval)   out="$(_iterm_favicon_py reeval --cwd "$PWD")" ;;
-    set-icon) out="$(_iterm_favicon_py set-icon "$2" --cwd "$PWD")" ;;
-    rename)   out="$(_iterm_favicon_py rename "$2" --cwd "$PWD")" ;;
-    clean)    _iterm_favicon_py clean; return 0 ;;
-    *) echo "usage: iterm-favicon {reeval|set-icon <pad>|rename [naam]|clean}"; return 1 ;;
+    reeval)   out="$(_livery_py reeval --cwd "$PWD")" ;;
+    set-icon) out="$(_livery_py set-icon "$2" --cwd "$PWD")" ;;
+    rename)   out="$(_livery_py rename "$2" --cwd "$PWD")" ;;
+    clean)    _livery_py clean; return 0 ;;
+    *) echo "usage: livery {reeval|set-icon <pad>|rename [naam]|clean}"; return 1 ;;
   esac
   print -rn -- "$out"
 }
 
 autoload -U add-zsh-hook
-add-zsh-hook chpwd _iterm_favicon_run
-_iterm_favicon_run   # bij startup
+add-zsh-hook chpwd _livery_run
+_livery_run   # bij startup
 ```
 
 > `reeval`/`set-icon`/`rename` retourneren de escape-sequences uit `app.py`, dus
 > de tab werkt meteen bij. `clean` print alleen status (stderr) en raakt de tab niet.
 
-- [ ] **Step 2: smoke-test syntaxis** — `zsh -n iterm-favicon.zsh && echo OK` → `OK`.
+- [ ] **Step 2: smoke-test syntaxis** — `zsh -n livery.zsh && echo OK` → `OK`.
 
-- [ ] **Step 3: smoke-test sourcen** — `zsh -c 'source ./iterm-favicon.zsh; type _iterm_favicon_run >/dev/null && type iterm-favicon >/dev/null && echo OK'` → `OK`.
+- [ ] **Step 3: smoke-test sourcen** — `zsh -c 'source ./livery.zsh; type _livery_run >/dev/null && type livery >/dev/null && echo OK'` → `OK`.
 
 - [ ] **Step 4: commit**
 ```bash
-git add iterm-favicon.zsh
-git commit -m "feat: zsh hook layer with chpwd + iterm-favicon command (incl rename)"
+git add livery.zsh
+git commit -m "feat: zsh hook layer with chpwd + livery command (incl rename)"
 ```
 
 ## Task 16 (REVISED): Suite + end-to-end (incl. titel)
 
-- [ ] **Step 1: volledige suite** — `cd ~/projects/iterm-favicon && python3 -m pytest -q` → alle PASS.
-- [ ] **Step 2: activeren** — voeg `source ~/projects/iterm-favicon/iterm-favicon.zsh` toe aan `~/.zshrc`, open een **nieuwe iTerm2-tab**.
-- [ ] **Step 3: manifest-project** — `cd` naar een webproject met `site.webmanifest`: tab krijgt icoon + tint + titel (manifest-naam). Check `~/.config/iterm-favicon/dirs/` en de DynamicProfiles-map.
+- [ ] **Step 1: volledige suite** — `cd ~/projects/livery && python3 -m pytest -q` → alle PASS.
+- [ ] **Step 2: activeren** — voeg `source ~/projects/livery/livery.zsh` toe aan `~/.zshrc`, open een **nieuwe iTerm2-tab**.
+- [ ] **Step 3: manifest-project** — `cd` naar een webproject met `site.webmanifest`: tab krijgt icoon + tint + titel (manifest-naam). Check `~/.config/livery/dirs/` en de DynamicProfiles-map.
 - [ ] **Step 4: env-only + titel-persistentie** — `cd` naar een map met alleen `.env` (met `APP_NAME`): tab krijgt de titel maar geen custom icoon. **Belangrijk:** controleer of de titel blijft staan na een paar prompts; als je zsh-config de titel in `precmd` herschrijft, los dat op (bv. de hook ná je titel-setter laten draaien, of de titel-setter uitschakelen).
-- [ ] **Step 5: rename + reset** — `iterm-favicon rename dev` → titel wordt `<Naam> | dev`; `iterm-favicon rename` (leeg) → suffix weg; `cd /tmp` (geen manifest/env) → reset.
-- [ ] **Step 6: sterktes afstemmen** (optioneel) — `export ITERM_FAVICON_TAB_STRENGTH=0.10` etc., nieuwe tab, `iterm-favicon reeval`.
+- [ ] **Step 5: rename + reset** — `livery rename dev` → titel wordt `<Naam> | dev`; `livery rename` (leeg) → suffix weg; `cd /tmp` (geen manifest/env) → reset.
+- [ ] **Step 6: sterktes afstemmen** (optioneel) — `export LIVERY_TAB_STRENGTH=0.10` etc., nieuwe tab, `livery reeval`.
 - [ ] **Step 7: commit eventuele tuning.**

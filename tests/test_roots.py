@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from iterm_favicon.roots import find_project_root
+from livery.roots import find_project_root
 
 
 def test_walks_up_to_git_dir(tmp_path):

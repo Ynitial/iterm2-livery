@@ -1,4 +1,4 @@
-from iterm_favicon.store import iter_entries, read_entry, store_path, write_entry
+from livery.store import iter_entries, read_entry, store_path, write_entry
 
 
 def test_write_then_read(tmp_path):

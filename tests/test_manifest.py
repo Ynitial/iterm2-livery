@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from iterm_favicon.manifest import find_manifest
+from livery.manifest import find_manifest
 
 
 def test_finds_manifest_in_subdir(tmp_path):
@@ -30,7 +30,7 @@ def test_returns_none_when_absent(tmp_path):
     assert find_manifest(tmp_path) is None
 
 
-from iterm_favicon.manifest import first_png
+from livery.manifest import first_png
 
 
 def test_first_png_relative_src(tmp_path):

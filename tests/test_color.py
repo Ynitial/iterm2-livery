@@ -1,6 +1,6 @@
 import struct
 
-from iterm_favicon.color import average_color, dominant_color, read_bmp
+from livery.color import average_color, dominant_color, read_bmp
 
 
 def _bmp(pixels, w, h):
@@ -44,7 +44,7 @@ import shutil
 
 import pytest
 
-from iterm_favicon.color import sips_pixels, color_from_png
+from livery.color import sips_pixels, color_from_png
 
 
 sips_available = pytest.mark.skipif(shutil.which("sips") is None, reason="sips ontbreekt")

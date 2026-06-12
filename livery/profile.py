@@ -4,11 +4,11 @@ from pathlib import Path
 
 
 def profile_guid(root):
-    return "iterm-favicon-" + hashlib.sha1(str(root).encode()).hexdigest()[:16]
+    return "livery-" + hashlib.sha1(str(root).encode()).hexdigest()[:16]
 
 
 def profile_name(root):
-    return f"favicon: {Path(root).name}"
+    return f"livery: {Path(root).name}"
 
 
 def profile_file(profiles_dir, root):

@@ -1,4 +1,4 @@
-from iterm_favicon.title import base_name, name_from_env, name_from_manifest, tab_title
+from livery.title import base_name, name_from_env, name_from_manifest, tab_title
 
 
 def test_name_from_manifest_prefers_name(tmp_path):

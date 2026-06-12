@@ -1,10 +1,10 @@
-from iterm_favicon.escapes import (
+from livery.escapes import (
     default_look, reset, reset_tab_color, set_profile, tab_color, title,
 )
 
 
 def test_set_profile():
-    assert set_profile("favicon: x") == "\033]1337;SetProfile=favicon: x\007"
+    assert set_profile("livery: x") == "\033]1337;SetProfile=livery: x\007"
 
 
 def test_tab_color_three_channels():
