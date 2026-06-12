@@ -38,3 +38,31 @@ def test_dominant_falls_back_to_average_when_all_extreme():
     pixels = [(255, 255, 255)] * 4 + [(0, 0, 0)] * 4
     # alles is extreem -> gemiddelde
     assert dominant_color(pixels) == average_color(pixels)
+
+
+import shutil
+
+import pytest
+
+from iterm_favicon.color import sips_pixels, color_from_png
+
+
+sips_available = pytest.mark.skipif(shutil.which("sips") is None, reason="sips ontbreekt")
+
+
+@sips_available
+def test_sips_pixels_solid_red(make_png, tmp_path):
+    png = tmp_path / "red.png"
+    make_png(png, (220, 30, 40), w=32, h=32)
+    pixels = sips_pixels(png, 8)
+    assert len(pixels) == 64
+    r, g, b = pixels[0]
+    assert r > 150 and g < 90 and b < 90  # ruwweg rood na herschaling
+
+
+@sips_available
+def test_color_from_png_solid(make_png, tmp_path):
+    png = tmp_path / "blue.png"
+    make_png(png, (30, 60, 210), w=32, h=32)
+    r, g, b = color_from_png(png)
+    assert b > 150 and b > r and b > g

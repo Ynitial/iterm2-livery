@@ -1,5 +1,9 @@
+import os
 import struct
+import subprocess
+import tempfile
 from collections import Counter
+from pathlib import Path
 
 NEAR = 24  # drempel voor "bijna zwart/wit"
 
@@ -45,3 +49,27 @@ def dominant_color(pixels):
     winner = counts.most_common(1)[0][0]
     members = [p for p in candidates if tuple(c >> 4 for c in p) == winner]
     return average_color(members)
+
+
+DOMINANT_SIZE = 16
+
+
+def sips_pixels(png_path, size):
+    """Schaal de PNG naar size×size via sips, lever BMP-pixels (r,g,b)."""
+    with tempfile.TemporaryDirectory() as td:
+        out = os.path.join(td, "o.bmp")
+        subprocess.run(
+            ["sips", "-s", "format", "bmp", "-z", str(size), str(size),
+             str(png_path), "--out", out],
+            check=True, capture_output=True,
+        )
+        return read_bmp(Path(out).read_bytes())
+
+
+def color_from_png(png_path):
+    """Dominante kleur van een PNG; valt terug op None bij sips/decode-fout."""
+    try:
+        pixels = sips_pixels(png_path, DOMINANT_SIZE)
+    except (subprocess.CalledProcessError, ValueError, OSError):
+        return None
+    return dominant_color(pixels)
