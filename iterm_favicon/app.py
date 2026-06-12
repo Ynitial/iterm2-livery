@@ -69,6 +69,9 @@ def _emit(entry, theme):
     return out
 
 
+from iterm_favicon.profile import profile_guid
+
+
 def cmd_emit(cwd, profiles_dir, store_dir):
     root = find_project_root(cwd)
     theme = detect_theme()
@@ -92,3 +95,61 @@ def cmd_emit(cwd, profiles_dir, store_dir):
         entry["last_theme"] = theme
         store.write_entry(store_dir, root, entry)
     return _emit(entry, theme)
+
+
+def cmd_reeval(cwd, profiles_dir, store_dir):
+    root = find_project_root(cwd)
+    theme = detect_theme()
+    old = store.read_entry(store_dir, root)
+    entry = _detect(root)
+    if entry is None:
+        return escapes.reset()
+    if old and old.get("custom_name"):
+        entry["custom_name"] = old["custom_name"]
+    entry["last_theme"] = theme
+    store.write_entry(store_dir, root, entry)
+    _ensure_profile(profiles_dir, entry, theme)
+    return _emit(entry, theme)
+
+
+def cmd_set_icon(icon_path, cwd, profiles_dir, store_dir):
+    root = find_project_root(cwd)
+    theme = detect_theme()
+    icon = Path(icon_path).expanduser().resolve()
+    rgb = color_from_png(icon)
+    if rgb is None:
+        return escapes.reset()
+    old = store.read_entry(store_dir, root)
+    name = old["name"] if old and old.get("name") else base_name(root, find_manifest(root, maxdepth=_maxdepth()))
+    entry = {
+        "root": str(root), "icon_path": str(icon), "dominant_color": list(rgb),
+        "name": name, "custom_name": old.get("custom_name") if old else None,
+        "source": "manual", "last_theme": theme,
+    }
+    store.write_entry(store_dir, root, entry)
+    _ensure_profile(profiles_dir, entry, theme)
+    return _emit(entry, theme)
+
+
+def cmd_rename(custom, cwd, profiles_dir, store_dir):
+    root = find_project_root(cwd)
+    theme = detect_theme()
+    entry = store.read_entry(store_dir, root) or _detect(root, force=True)
+    entry["custom_name"] = custom or None
+    entry["last_theme"] = theme
+    store.write_entry(store_dir, root, entry)
+    _ensure_profile(profiles_dir, entry, theme)
+    return _emit(entry, theme)
+
+
+def cmd_clean(profiles_dir, store_dir):
+    removed = []
+    for entry in list(store.iter_entries(store_dir)):
+        root = entry.get("root", "")
+        if root and not Path(root).exists():
+            store.delete_entry(store_dir, root)
+            pf = Path(profiles_dir) / f"{profile_guid(root)}.json"
+            if pf.exists():
+                pf.unlink()
+            removed.append(root)
+    return removed

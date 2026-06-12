@@ -35,3 +35,9 @@ def iter_entries(store_dir):
             yield json.loads(f.read_text())
         except ValueError:
             continue
+
+
+def delete_entry(store_dir, root):
+    p = store_path(store_dir, root)
+    if p.exists():
+        p.unlink()
