@@ -69,14 +69,17 @@ Aanroep-contract (zodat tests geïsoleerd draaien):
 iterm_favicon.py emit     --cwd <dir> --profiles-dir <dir> --store-dir <dir>
 iterm_favicon.py reeval   --cwd <dir> --profiles-dir <dir> --store-dir <dir>
 iterm_favicon.py set-icon <pad> --cwd <dir> --profiles-dir <dir> --store-dir <dir>
+iterm_favicon.py rename   [custom] --cwd <dir> --profiles-dir <dir> --store-dir <dir>
 iterm_favicon.py clean    --profiles-dir <dir> --store-dir <dir>
 ```
 - `emit` — leest de store voor de huidige project-root; bij een treffer emit het
   meteen (snel pad). Bij geen treffer: auto-detecteren, store vullen, emitten.
 - `reeval` — forceert opnieuw afleiden uit de `site.webmanifest` en overschrijft
-  de store-entry voor deze root.
+  de store-entry voor deze root (behoudt de `rename`-suffix).
 - `set-icon <pad>` — slaat een handmatig icoon-pad op in de store-entry
   (overschrijft auto-detectie); kleur wordt uit die PNG afgeleid.
+- `rename [custom]` — zet een eigen achtervoegsel achter de afgeleide naam:
+  titel wordt `<Naam> | <custom>`. Zonder argument wist het de suffix.
 - `clean` — ruimt verweesde store-entries en profielen op.
 
 `emit` print de escape-sequences naar stdout; de zsh-laag echoot die door naar de
@@ -143,6 +146,23 @@ maar zijn override-baar in tests.
     ST`). De normale look herstelt zo zodra je een project zonder favicon
     binnenloopt.
 
+## Tab-titel
+
+Naast icoon + kleur krijgt elke themed tab een titel via `OSC 0` (`ESC]0;<titel>BEL`).
+
+- **Naam-bron (volgorde):** manifest `name` → manifest `short_name` → `.env`
+  (eerste niet-lege van `APP_NAME`, `PROJECT_NAME`, `NAME`, `VITE_APP_NAME`,
+  `NEXT_PUBLIC_APP_NAME`) → basisnaam van de project-root.
+- **"Themed":** een root wordt behandeld als er een `site.webmanifest` **of** een
+  `.env` aanwezig is. Manifest-met-PNG → icoon + kleur + titel. Alleen `.env`
+  (geen favicon) → titel + Default-profiel (geen icoon/kleur). Geen van beide →
+  volledige reset.
+- **`rename`:** zet `custom_name`; de getoonde titel wordt `"<name> | <custom_name>"`.
+  `reeval`/`set-icon` behouden de `custom_name`.
+- **Reset:** bij een niet-themed map wordt de titel gewist (`ESC]0;BEL`) naast de
+  profiel/kleur-reset. (Titel-persistentie t.o.v. een prompt die de titel
+  herschrijft wordt in de E2E geverifieerd.)
+
 ## Per-map store
 
 De store is de **bron van waarheid** (geen wegwerp-cache met mtime-invalidatie).
@@ -156,10 +176,12 @@ Eenmaal gevuld leest `emit` 'm direct en doet géén manifest-scan meer.
   ```json
   {
     "root": "/abs/pad/naar/project",
-    "icon_path": "/abs/pad/naar/icon.png",
-    "dominant_color": [82, 113, 255],
-    "source": "manifest",          // of "manual"
-    "last_theme": "dark"            // voor het vermijden van profiel-rewrites
+    "icon_path": "/abs/pad/naar/icon.png",  // null bij .env-only project
+    "dominant_color": [82, 113, 255],        // null als er geen icoon is
+    "name": "Slowboard",                      // afgeleide naam (titel-basis)
+    "custom_name": null,                      // rename-suffix; titel = "<name> | <custom_name>"
+    "source": "manifest",                     // "manifest" | "manual" | "env" | "name"
+    "last_theme": "dark"                      // voor het vermijden van profiel-rewrites
   }
   ```
 - **Wanneer geschreven:** alleen bij eerste auto-detectie, `reeval` of

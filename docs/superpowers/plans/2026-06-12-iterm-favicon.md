@@ -1509,3 +1509,725 @@ git add -A && git commit -m "chore: tune defaults after end-to-end check"
 - **Placeholders:** geen TBD/TODO; alle code-stappen bevatten volledige code.
 - **Type-consistentie:** functienamen consistent over taken (`find_project_root`, `find_manifest`/`first_png`, `dominant_color`/`average_color`/`color_from_png`/`sips_pixels`, `detect_theme`/`mute`, `store_path`/`read_entry`/`write_entry`/`iter_entries`/`delete_entry`, `build_profile`/`write_profile`/`profile_file`/`profile_guid`/`profile_name`, `set_profile`/`tab_color`/`reset`, `cmd_emit`/`cmd_reeval`/`cmd_set_icon`/`cmd_clean`/`_ensure_profile`/`_autodetect`/`_emit_for`). `app.detect_theme` en `app.color_from_png` zijn als module-attributen geïmporteerd zodat tests ze kunnen monkeypatchen.
 ```
+
+---
+
+# ADDENDUM: Tab-title feature (2026-06-12)
+
+> Dit addendum **vervangt** de code/tests van Taken 10, 11, 12, 13, 14 en 16
+> hierboven, en voegt **Taak 10b** (titel-module) toe. Bouw Taken 1–9 zoals
+> hierboven; gebruik vanaf Taak 10 de versies in dit addendum.
+>
+> Wijzigingen: tab-titel via `OSC 0`; naam-bron manifest `name`→`short_name`→
+> `.env`→mapnaam; `rename`-commando voor `"<name> | <custom>"`; env-only
+> theming (titel zonder icoon); zsh draait de helper via `PYTHONPATH`/`-m`.
+
+## Task 10 (REVISED): Escape-sequences (incl. titel + losse resets)
+
+**Files:** Create `iterm_favicon/escapes.py`, `tests/test_escapes.py`
+
+- [ ] **Step 1: failing test** — Create `tests/test_escapes.py`:
+```python
+from iterm_favicon.escapes import (
+    default_look, reset, reset_tab_color, set_profile, tab_color, title,
+)
+
+
+def test_set_profile():
+    assert set_profile("favicon: x") == "\033]1337;SetProfile=favicon: x\007"
+
+
+def test_tab_color_three_channels():
+    assert tab_color((10, 20, 30)) == ("\033]6;1;bg;red;brightness;10\007"
+                                       "\033]6;1;bg;green;brightness;20\007"
+                                       "\033]6;1;bg;blue;brightness;30\007")
+
+
+def test_title():
+    assert title("Slowboard | dev") == "\033]0;Slowboard | dev\007"
+
+
+def test_reset_tab_color():
+    assert reset_tab_color() == "\033]6;1;bg;*;default\007"
+
+
+def test_default_look():
+    assert default_look() == "\033]1337;SetProfile=Default\007\033]6;1;bg;*;default\007"
+
+
+def test_reset_clears_title_then_default_look():
+    assert reset() == "\033]0;\007\033]1337;SetProfile=Default\007\033]6;1;bg;*;default\007"
+```
+
+- [ ] **Step 2: verify fail** — `python3 -m pytest tests/test_escapes.py -q` → FAIL (No module named 'iterm_favicon.escapes').
+
+- [ ] **Step 3: implement** — Create `iterm_favicon/escapes.py`:
+```python
+ESC = "\033"
+BEL = "\007"
+
+
+def set_profile(name):
+    return f"{ESC}]1337;SetProfile={name}{BEL}"
+
+
+def tab_color(rgb):
+    r, g, b = rgb
+    return (f"{ESC}]6;1;bg;red;brightness;{r}{BEL}"
+            f"{ESC}]6;1;bg;green;brightness;{g}{BEL}"
+            f"{ESC}]6;1;bg;blue;brightness;{b}{BEL}")
+
+
+def reset_tab_color():
+    return f"{ESC}]6;1;bg;*;default{BEL}"
+
+
+def title(text):
+    return f"{ESC}]0;{text}{BEL}"
+
+
+def default_look():
+    """Default-profiel + standaard tabkleur (titel onaangeroerd)."""
+    return set_profile("Default") + reset_tab_color()
+
+
+def reset():
+    """Volledige reset voor een niet-themed map: titel wissen + default look."""
+    return title("") + default_look()
+```
+
+- [ ] **Step 4: verify pass** — `python3 -m pytest tests/test_escapes.py -q` → PASS (6 passed).
+
+- [ ] **Step 5: commit**
+```bash
+git add iterm_favicon/escapes.py tests/test_escapes.py
+git commit -m "feat: OSC escapes for profile, tab color and title"
+```
+
+## Task 10b (NEW): Titel-afleiding
+
+**Files:** Create `iterm_favicon/title.py`, `tests/test_title.py`
+
+- [ ] **Step 1: failing test** — Create `tests/test_title.py`:
+```python
+from iterm_favicon.title import base_name, name_from_env, name_from_manifest, tab_title
+
+
+def test_name_from_manifest_prefers_name(tmp_path):
+    m = tmp_path / "site.webmanifest"
+    m.write_text('{"name":"Slowboard","short_name":"SB"}')
+    assert name_from_manifest(m) == "Slowboard"
+
+
+def test_name_from_manifest_falls_back_to_short_name(tmp_path):
+    m = tmp_path / "site.webmanifest"
+    m.write_text('{"short_name":"SB"}')
+    assert name_from_manifest(m) == "SB"
+
+
+def test_name_from_manifest_none_when_empty(tmp_path):
+    m = tmp_path / "site.webmanifest"
+    m.write_text("{}")
+    assert name_from_manifest(m) is None
+
+
+def test_name_from_env_first_nonempty_in_priority(tmp_path):
+    (tmp_path / ".env").write_text('FOO=bar\nPROJECT_NAME="My App"\nNAME=ignored\n')
+    assert name_from_env(tmp_path) == "My App"
+
+
+def test_name_from_env_none_when_absent(tmp_path):
+    assert name_from_env(tmp_path) is None
+
+
+def test_base_name_precedence_manifest_over_env(tmp_path):
+    m = tmp_path / "site.webmanifest"
+    m.write_text('{"name":"FromManifest"}')
+    (tmp_path / ".env").write_text("APP_NAME=FromEnv\n")
+    assert base_name(tmp_path, m) == "FromManifest"
+
+
+def test_base_name_uses_env_without_manifest(tmp_path):
+    (tmp_path / ".env").write_text("APP_NAME=FromEnv\n")
+    assert base_name(tmp_path, None) == "FromEnv"
+
+
+def test_base_name_falls_back_to_dirname(tmp_path):
+    d = tmp_path / "slowboard"
+    d.mkdir()
+    assert base_name(d, None) == "slowboard"
+
+
+def test_tab_title_with_and_without_custom():
+    assert tab_title("Slowboard", "dev") == "Slowboard | dev"
+    assert tab_title("Slowboard", None) == "Slowboard"
+    assert tab_title("Slowboard", "") == "Slowboard"
+```
+
+- [ ] **Step 2: verify fail** — `python3 -m pytest tests/test_title.py -q` → FAIL (No module named 'iterm_favicon.title').
+
+- [ ] **Step 3: implement** — Create `iterm_favicon/title.py`:
+```python
+import json
+from pathlib import Path
+
+ENV_KEYS = ("APP_NAME", "PROJECT_NAME", "NAME", "VITE_APP_NAME", "NEXT_PUBLIC_APP_NAME")
+
+
+def name_from_manifest(manifest_path):
+    try:
+        data = json.loads(Path(manifest_path).read_text())
+    except (OSError, ValueError):
+        return None
+    for key in ("name", "short_name"):
+        val = data.get(key)
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+    return None
+
+
+def name_from_env(root):
+    try:
+        lines = (Path(root) / ".env").read_text().splitlines()
+    except OSError:
+        return None
+    values = {}
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        values[key.strip()] = val.strip().strip('"').strip("'")
+    for key in ENV_KEYS:
+        if values.get(key):
+            return values[key]
+    return None
+
+
+def base_name(root, manifest_path=None):
+    if manifest_path is not None:
+        name = name_from_manifest(manifest_path)
+        if name:
+            return name
+    name = name_from_env(root)
+    if name:
+        return name
+    return Path(root).name
+
+
+def tab_title(base, custom=None):
+    return f"{base} | {custom}" if custom else base
+```
+
+- [ ] **Step 4: verify pass** — `python3 -m pytest tests/test_title.py -q` → PASS (9 passed).
+
+- [ ] **Step 5: commit**
+```bash
+git add iterm_favicon/title.py tests/test_title.py
+git commit -m "feat: tab title name derivation (manifest -> .env -> dirname)"
+```
+
+## Task 11 (REVISED): Orchestratie — `emit` (titel + env-only theming)
+
+**Files:** Create `iterm_favicon/app.py`, `tests/test_app.py`
+
+- [ ] **Step 1: failing test** — Create `tests/test_app.py`:
+```python
+import os
+
+from iterm_favicon import app, escapes, store
+from iterm_favicon.profile import profile_file
+
+
+def _dirs(tmp_path):
+    return {"profiles_dir": tmp_path / "profiles", "store_dir": tmp_path / "store"}
+
+
+def test_emit_not_a_project_returns_reset(tmp_path, monkeypatch):
+    monkeypatch.setattr(app, "detect_theme", lambda: "dark")
+    out = app.cmd_emit(cwd=tmp_path, **_dirs(tmp_path))
+    assert out == escapes.reset()
+
+
+def test_emit_manifest_sets_icon_color_and_title(tmp_path, make_png, monkeypatch):
+    monkeypatch.setattr(app, "detect_theme", lambda: "dark")
+    monkeypatch.setattr(app, "color_from_png", lambda p: (40, 80, 200))
+    (tmp_path / "site.webmanifest").write_text('{"name":"Slowboard","icons":[{"src":"a.png"}]}')
+    make_png(tmp_path / "a.png", (40, 80, 200))
+    d = _dirs(tmp_path)
+
+    out = app.cmd_emit(cwd=tmp_path, **d)
+
+    assert "]0;Slowboard\007" in out
+    assert "SetProfile=favicon:" in out
+    entry = store.read_entry(d["store_dir"], tmp_path.resolve())
+    assert entry["dominant_color"] == [40, 80, 200]
+    assert entry["name"] == "Slowboard"
+    assert entry["source"] == "manifest"
+    assert profile_file(d["profiles_dir"], tmp_path.resolve()).exists()
+
+
+def test_emit_env_only_sets_title_no_icon(tmp_path, monkeypatch):
+    monkeypatch.setattr(app, "detect_theme", lambda: "dark")
+    (tmp_path / ".env").write_text("APP_NAME=EnvApp\n")
+    d = _dirs(tmp_path)
+
+    out = app.cmd_emit(cwd=tmp_path, **d)
+
+    assert "]0;EnvApp\007" in out
+    assert "SetProfile=Default" in out
+    entry = store.read_entry(d["store_dir"], tmp_path.resolve())
+    assert entry["icon_path"] is None
+    assert entry["name"] == "EnvApp"
+    assert entry["source"] == "env"
+
+
+def test_emit_uses_store_without_rescanning(tmp_path, make_png, monkeypatch):
+    monkeypatch.setattr(app, "detect_theme", lambda: "dark")
+    d = _dirs(tmp_path)
+    icon = tmp_path / "a.png"
+    make_png(icon, (40, 80, 200))
+    store.write_entry(d["store_dir"], tmp_path.resolve(), {
+        "root": str(tmp_path.resolve()), "icon_path": str(icon),
+        "dominant_color": [40, 80, 200], "name": "Cached", "custom_name": None,
+        "source": "manifest", "last_theme": "dark",
+    })
+
+    def boom(_):
+        raise AssertionError("color_from_png mag niet draaien op het snelpad")
+
+    monkeypatch.setattr(app, "color_from_png", boom)
+    out = app.cmd_emit(cwd=tmp_path, **d)
+    assert "]0;Cached\007" in out
+    assert "SetProfile=favicon:" in out
+
+
+def test_emit_missing_icon_file_resets(tmp_path, monkeypatch):
+    monkeypatch.setattr(app, "detect_theme", lambda: "dark")
+    d = _dirs(tmp_path)
+    store.write_entry(d["store_dir"], tmp_path.resolve(), {
+        "root": str(tmp_path.resolve()), "icon_path": str(tmp_path / "gone.png"),
+        "dominant_color": [1, 2, 3], "name": "X", "custom_name": None,
+        "source": "manifest", "last_theme": "dark",
+    })
+    out = app.cmd_emit(cwd=tmp_path, **d)
+    assert out == escapes.reset()
+```
+
+- [ ] **Step 2: verify fail** — `python3 -m pytest tests/test_app.py -q` → FAIL (No module named 'iterm_favicon.app').
+
+- [ ] **Step 3: implement** — Create `iterm_favicon/app.py`:
+```python
+import os
+from pathlib import Path
+
+from iterm_favicon import escapes, store
+from iterm_favicon.color import color_from_png
+from iterm_favicon.manifest import find_manifest, first_png
+from iterm_favicon.profile import build_profile, profile_file, profile_name, write_profile
+from iterm_favicon.roots import find_project_root
+from iterm_favicon.tint import detect_theme, mute
+from iterm_favicon.title import base_name, tab_title
+
+DEFAULT_STORE = Path.home() / ".config" / "iterm-favicon" / "dirs"
+DEFAULT_PROFILES = Path.home() / "Library" / "Application Support" / "iTerm2" / "DynamicProfiles"
+
+
+def _tab_strength():
+    return float(os.environ.get("ITERM_FAVICON_TAB_STRENGTH", "0.15"))
+
+
+def _bg_strength():
+    return float(os.environ.get("ITERM_FAVICON_BG_STRENGTH", "0.07"))
+
+
+def _maxdepth():
+    return int(os.environ.get("ITERM_FAVICON_MAXDEPTH", "6"))
+
+
+def _detect(root, force=False):
+    """Bouw store-velden voor een root. None als 't geen project is (en niet force)."""
+    manifest = find_manifest(root, maxdepth=_maxdepth())
+    has_env = (Path(root) / ".env").exists()
+    if manifest is None and not has_env and not force:
+        return None
+    png = first_png(manifest) if manifest else None
+    if png is not None and not Path(png).exists():
+        png = None
+    rgb = color_from_png(png) if png else None
+    source = "manifest" if png else ("env" if has_env else "name")
+    return {
+        "root": str(root),
+        "icon_path": str(png) if png else None,
+        "dominant_color": list(rgb) if rgb else None,
+        "name": base_name(root, manifest),
+        "custom_name": None,
+        "source": source,
+        "last_theme": None,
+    }
+
+
+def _ensure_profile(profiles_dir, entry, theme):
+    """Schrijf het Dynamic Profile, maar alleen als de entry een icoon heeft."""
+    if not entry.get("icon_path") or not entry.get("dominant_color"):
+        return
+    rgb = tuple(entry["dominant_color"])
+    tab = mute(rgb, theme, _tab_strength())
+    bg = mute(rgb, theme, _bg_strength())
+    write_profile(profiles_dir, build_profile(entry["root"], entry["icon_path"], tab, bg))
+
+
+def _emit(entry, theme):
+    """Escape-output: titel + (icoon-profiel + kleur) OF default-look."""
+    out = escapes.title(tab_title(entry["name"], entry.get("custom_name")))
+    if entry.get("icon_path") and entry.get("dominant_color"):
+        rgb = tuple(entry["dominant_color"])
+        out += escapes.set_profile(profile_name(entry["root"]))
+        out += escapes.tab_color(mute(rgb, theme, _tab_strength()))
+    else:
+        out += escapes.default_look()
+    return out
+
+
+def cmd_emit(cwd, profiles_dir, store_dir):
+    root = find_project_root(cwd)
+    theme = detect_theme()
+    entry = store.read_entry(store_dir, root)
+
+    if entry is None:
+        entry = _detect(root)
+        if entry is None:
+            return escapes.reset()
+        entry["last_theme"] = theme
+        store.write_entry(store_dir, root, entry)
+        _ensure_profile(profiles_dir, entry, theme)
+        return _emit(entry, theme)
+
+    if entry.get("icon_path") and not Path(entry["icon_path"]).exists():
+        return escapes.reset()
+
+    needs_profile = entry.get("icon_path") and not profile_file(profiles_dir, root).exists()
+    if entry.get("last_theme") != theme or needs_profile:
+        _ensure_profile(profiles_dir, entry, theme)
+        entry["last_theme"] = theme
+        store.write_entry(store_dir, root, entry)
+    return _emit(entry, theme)
+```
+
+- [ ] **Step 4: verify pass** — `python3 -m pytest tests/test_app.py -q` → PASS (5 passed).
+
+- [ ] **Step 5: commit**
+```bash
+git add iterm_favicon/app.py tests/test_app.py
+git commit -m "feat: emit orchestration with title + env-only theming"
+```
+
+## Task 12 (REVISED): `reeval`, `set-icon`, `rename`, `clean`
+
+**Files:** Modify `iterm_favicon/app.py`, `iterm_favicon/store.py`, `tests/test_app.py`
+
+- [ ] **Step 1: failing test** — APPEND to `tests/test_app.py`:
+```python
+def test_reeval_overwrites_entry_keeps_custom(tmp_path, make_png, monkeypatch):
+    monkeypatch.setattr(app, "detect_theme", lambda: "dark")
+    d = _dirs(tmp_path)
+    (tmp_path / "site.webmanifest").write_text('{"name":"Slow","icons":[{"src":"a.png"}]}')
+    make_png(tmp_path / "a.png", (10, 10, 200))
+    store.write_entry(d["store_dir"], tmp_path.resolve(), {
+        "root": str(tmp_path.resolve()), "icon_path": "/old.png",
+        "dominant_color": [1, 1, 1], "name": "Old", "custom_name": "dev",
+        "source": "manifest", "last_theme": "dark",
+    })
+    monkeypatch.setattr(app, "color_from_png", lambda p: (10, 10, 200))
+    app.cmd_reeval(cwd=tmp_path, **d)
+    entry = store.read_entry(d["store_dir"], tmp_path.resolve())
+    assert entry["dominant_color"] == [10, 10, 200]
+    assert entry["icon_path"].endswith("a.png")
+    assert entry["name"] == "Slow"
+    assert entry["custom_name"] == "dev"
+
+
+def test_set_icon_sets_manual_source_and_dirname(tmp_path, make_png, monkeypatch):
+    monkeypatch.setattr(app, "detect_theme", lambda: "dark")
+    d = _dirs(tmp_path)
+    icon = tmp_path / "logo.png"
+    make_png(icon, (200, 10, 10))
+    monkeypatch.setattr(app, "color_from_png", lambda p: (200, 10, 10))
+    app.cmd_set_icon(str(icon), cwd=tmp_path, **d)
+    entry = store.read_entry(d["store_dir"], tmp_path.resolve())
+    assert entry["source"] == "manual"
+    assert entry["icon_path"] == str(icon)
+    assert entry["dominant_color"] == [200, 10, 10]
+    assert entry["name"] == tmp_path.name
+
+
+def test_rename_sets_and_clears_custom(tmp_path, monkeypatch):
+    monkeypatch.setattr(app, "detect_theme", lambda: "dark")
+    d = _dirs(tmp_path)
+    (tmp_path / ".env").write_text("APP_NAME=EnvApp\n")
+    out = app.cmd_rename("dev", cwd=tmp_path, **d)
+    assert "]0;EnvApp | dev\007" in out
+    assert store.read_entry(d["store_dir"], tmp_path.resolve())["custom_name"] == "dev"
+    app.cmd_rename("", cwd=tmp_path, **d)
+    assert store.read_entry(d["store_dir"], tmp_path.resolve())["custom_name"] is None
+
+
+def test_rename_on_bare_dir_uses_dirname(tmp_path, monkeypatch):
+    monkeypatch.setattr(app, "detect_theme", lambda: "dark")
+    d = _dirs(tmp_path)
+    out = app.cmd_rename("x", cwd=tmp_path, **d)
+    assert f"]0;{tmp_path.name} | x\007" in out
+
+
+def test_clean_removes_orphan_entries(tmp_path):
+    d = _dirs(tmp_path)
+    gone = tmp_path / "gone"
+    alive = tmp_path / "alive"
+    alive.mkdir()
+    for root in (gone, alive):
+        entry = {"root": str(root.resolve()), "icon_path": "x.png",
+                 "dominant_color": [1, 2, 3], "name": "n", "custom_name": None,
+                 "source": "manifest", "last_theme": "dark"}
+        store.write_entry(d["store_dir"], root.resolve(), entry)
+        app._ensure_profile(d["profiles_dir"], entry, "dark")
+    removed = app.cmd_clean(**d)
+    assert str(gone.resolve()) in removed
+    assert store.read_entry(d["store_dir"], gone.resolve()) is None
+    assert store.read_entry(d["store_dir"], alive.resolve()) is not None
+```
+
+- [ ] **Step 2: verify fail** — `python3 -m pytest tests/test_app.py -q` → FAIL (AttributeError: module 'iterm_favicon.app' has no attribute 'cmd_reeval').
+
+- [ ] **Step 3: store delete helper** — APPEND to `iterm_favicon/store.py`:
+```python
+def delete_entry(store_dir, root):
+    p = store_path(store_dir, root)
+    if p.exists():
+        p.unlink()
+```
+
+- [ ] **Step 4: implement** — APPEND to `iterm_favicon/app.py`:
+```python
+from iterm_favicon.profile import profile_guid
+
+
+def cmd_reeval(cwd, profiles_dir, store_dir):
+    root = find_project_root(cwd)
+    theme = detect_theme()
+    old = store.read_entry(store_dir, root)
+    entry = _detect(root)
+    if entry is None:
+        return escapes.reset()
+    if old and old.get("custom_name"):
+        entry["custom_name"] = old["custom_name"]
+    entry["last_theme"] = theme
+    store.write_entry(store_dir, root, entry)
+    _ensure_profile(profiles_dir, entry, theme)
+    return _emit(entry, theme)
+
+
+def cmd_set_icon(icon_path, cwd, profiles_dir, store_dir):
+    root = find_project_root(cwd)
+    theme = detect_theme()
+    icon = Path(icon_path).expanduser().resolve()
+    rgb = color_from_png(icon)
+    if rgb is None:
+        return escapes.reset()
+    old = store.read_entry(store_dir, root)
+    name = old["name"] if old and old.get("name") else base_name(root, find_manifest(root, maxdepth=_maxdepth()))
+    entry = {
+        "root": str(root), "icon_path": str(icon), "dominant_color": list(rgb),
+        "name": name, "custom_name": old.get("custom_name") if old else None,
+        "source": "manual", "last_theme": theme,
+    }
+    store.write_entry(store_dir, root, entry)
+    _ensure_profile(profiles_dir, entry, theme)
+    return _emit(entry, theme)
+
+
+def cmd_rename(custom, cwd, profiles_dir, store_dir):
+    root = find_project_root(cwd)
+    theme = detect_theme()
+    entry = store.read_entry(store_dir, root) or _detect(root, force=True)
+    entry["custom_name"] = custom or None
+    entry["last_theme"] = theme
+    store.write_entry(store_dir, root, entry)
+    _ensure_profile(profiles_dir, entry, theme)
+    return _emit(entry, theme)
+
+
+def cmd_clean(profiles_dir, store_dir):
+    removed = []
+    for entry in list(store.iter_entries(store_dir)):
+        root = entry.get("root", "")
+        if root and not Path(root).exists():
+            store.delete_entry(store_dir, root)
+            pf = Path(profiles_dir) / f"{profile_guid(root)}.json"
+            if pf.exists():
+                pf.unlink()
+            removed.append(root)
+    return removed
+```
+
+- [ ] **Step 5: verify pass** — `python3 -m pytest tests/test_app.py -q` → PASS (10 passed).
+
+- [ ] **Step 6: commit**
+```bash
+git add iterm_favicon/app.py iterm_favicon/store.py tests/test_app.py
+git commit -m "feat: reeval, set-icon, rename and clean commands"
+```
+
+## Task 13 (REVISED): CLI-dispatch (incl. `rename`)
+
+**Files:** Create `iterm_favicon/__main__.py`, modify `tests/test_app.py`
+
+- [ ] **Step 1: failing test** — APPEND to `tests/test_app.py`:
+```python
+import subprocess
+import sys
+from pathlib import Path
+
+
+def test_cli_emit_not_a_project_prints_reset(tmp_path):
+    repo = Path(__file__).resolve().parent.parent
+    proc = subprocess.run(
+        [sys.executable, "-m", "iterm_favicon", "emit",
+         "--cwd", str(tmp_path),
+         "--profiles-dir", str(tmp_path / "p"),
+         "--store-dir", str(tmp_path / "s")],
+        cwd=repo, env=dict(os.environ), capture_output=True, text=True,
+    )
+    assert proc.returncode == 0
+    assert "SetProfile=Default" in proc.stdout
+
+
+def test_cli_rename_prints_title(tmp_path):
+    repo = Path(__file__).resolve().parent.parent
+    (tmp_path / ".env").write_text("APP_NAME=EnvApp\n")
+    proc = subprocess.run(
+        [sys.executable, "-m", "iterm_favicon", "rename", "dev",
+         "--cwd", str(tmp_path),
+         "--profiles-dir", str(tmp_path / "p"),
+         "--store-dir", str(tmp_path / "s")],
+        cwd=repo, env=dict(os.environ), capture_output=True, text=True,
+    )
+    assert proc.returncode == 0
+    assert "]0;EnvApp | dev\007" in proc.stdout
+```
+
+- [ ] **Step 2: verify fail** — `python3 -m pytest tests/test_app.py -k cli -q` → FAIL (No module named iterm_favicon.__main__ / non-zero returncode).
+
+- [ ] **Step 3: implement** — Create `iterm_favicon/__main__.py`:
+```python
+import argparse
+import sys
+
+from iterm_favicon import app
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(prog="iterm-favicon")
+    parser.add_argument("--cwd", default=".")
+    parser.add_argument("--profiles-dir", default=str(app.DEFAULT_PROFILES))
+    parser.add_argument("--store-dir", default=str(app.DEFAULT_STORE))
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("emit")
+    sub.add_parser("reeval")
+    p_set = sub.add_parser("set-icon")
+    p_set.add_argument("path")
+    p_ren = sub.add_parser("rename")
+    p_ren.add_argument("custom", nargs="?", default="")
+    sub.add_parser("clean")
+
+    a = parser.parse_args(argv)
+    dirs = {"profiles_dir": a.profiles_dir, "store_dir": a.store_dir}
+
+    if a.cmd == "emit":
+        sys.stdout.write(app.cmd_emit(cwd=a.cwd, **dirs))
+    elif a.cmd == "reeval":
+        sys.stdout.write(app.cmd_reeval(cwd=a.cwd, **dirs))
+    elif a.cmd == "set-icon":
+        sys.stdout.write(app.cmd_set_icon(a.path, cwd=a.cwd, **dirs))
+    elif a.cmd == "rename":
+        sys.stdout.write(app.cmd_rename(a.custom, cwd=a.cwd, **dirs))
+    elif a.cmd == "clean":
+        for root in app.cmd_clean(**dirs):
+            sys.stderr.write(f"removed {root}\n")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+```
+
+- [ ] **Step 4: verify pass** — `python3 -m pytest tests/test_app.py -q` → PASS (12 passed).
+
+- [ ] **Step 5: commit**
+```bash
+git add iterm_favicon/__main__.py tests/test_app.py
+git commit -m "feat: argparse CLI dispatch with rename"
+```
+
+## Task 14 (REVISED): zsh-laag (PYTHONPATH/-m + rename)
+
+**Files:** Create `iterm-favicon.zsh`
+
+- [ ] **Step 1: implement** — Create `iterm-favicon.zsh`:
+```zsh
+# iterm-favicon — source dit vanuit ~/.zshrc
+ITERM_FAVICON_DIR="${0:A:h}"
+
+_iterm_favicon_py() {
+  # Draai het pakket met de repo-root op PYTHONPATH zodat `import iterm_favicon` werkt.
+  PYTHONPATH="$ITERM_FAVICON_DIR" python3 -m iterm_favicon "$@"
+}
+
+_iterm_favicon_run() {
+  [[ "$TERM_PROGRAM" == "iTerm.app" ]] || return 0
+  local logfile="/dev/null"
+  [[ -n "$ITERM_FAVICON_LOG" ]] && logfile="$HOME/.config/iterm-favicon/log"
+  local out
+  out="$(_iterm_favicon_py emit --cwd "$PWD" 2>>"$logfile")" || return 0
+  print -rn -- "$out"
+}
+
+iterm-favicon() {
+  [[ "$TERM_PROGRAM" == "iTerm.app" ]] || { echo "iterm-favicon: alleen in iTerm2"; return 1; }
+  local out
+  case "$1" in
+    reeval)   out="$(_iterm_favicon_py reeval --cwd "$PWD")" ;;
+    set-icon) out="$(_iterm_favicon_py set-icon "$2" --cwd "$PWD")" ;;
+    rename)   out="$(_iterm_favicon_py rename "$2" --cwd "$PWD")" ;;
+    clean)    _iterm_favicon_py clean; return 0 ;;
+    *) echo "usage: iterm-favicon {reeval|set-icon <pad>|rename [naam]|clean}"; return 1 ;;
+  esac
+  print -rn -- "$out"
+}
+
+autoload -U add-zsh-hook
+add-zsh-hook chpwd _iterm_favicon_run
+_iterm_favicon_run   # bij startup
+```
+
+> `reeval`/`set-icon`/`rename` retourneren de escape-sequences uit `app.py`, dus
+> de tab werkt meteen bij. `clean` print alleen status (stderr) en raakt de tab niet.
+
+- [ ] **Step 2: smoke-test syntaxis** — `zsh -n iterm-favicon.zsh && echo OK` → `OK`.
+
+- [ ] **Step 3: smoke-test sourcen** — `zsh -c 'source ./iterm-favicon.zsh; type _iterm_favicon_run >/dev/null && type iterm-favicon >/dev/null && echo OK'` → `OK`.
+
+- [ ] **Step 4: commit**
+```bash
+git add iterm-favicon.zsh
+git commit -m "feat: zsh hook layer with chpwd + iterm-favicon command (incl rename)"
+```
+
+## Task 16 (REVISED): Suite + end-to-end (incl. titel)
+
+- [ ] **Step 1: volledige suite** — `cd ~/projects/iterm-favicon && python3 -m pytest -q` → alle PASS.
+- [ ] **Step 2: activeren** — voeg `source ~/projects/iterm-favicon/iterm-favicon.zsh` toe aan `~/.zshrc`, open een **nieuwe iTerm2-tab**.
+- [ ] **Step 3: manifest-project** — `cd` naar een webproject met `site.webmanifest`: tab krijgt icoon + tint + titel (manifest-naam). Check `~/.config/iterm-favicon/dirs/` en de DynamicProfiles-map.
+- [ ] **Step 4: env-only + titel-persistentie** — `cd` naar een map met alleen `.env` (met `APP_NAME`): tab krijgt de titel maar geen custom icoon. **Belangrijk:** controleer of de titel blijft staan na een paar prompts; als je zsh-config de titel in `precmd` herschrijft, los dat op (bv. de hook ná je titel-setter laten draaien, of de titel-setter uitschakelen).
+- [ ] **Step 5: rename + reset** — `iterm-favicon rename dev` → titel wordt `<Naam> | dev`; `iterm-favicon rename` (leeg) → suffix weg; `cd /tmp` (geen manifest/env) → reset.
+- [ ] **Step 6: sterktes afstemmen** (optioneel) — `export ITERM_FAVICON_TAB_STRENGTH=0.10` etc., nieuwe tab, `iterm-favicon reeval`.
+- [ ] **Step 7: commit eventuele tuning.**
