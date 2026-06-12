@@ -28,3 +28,36 @@ def test_respects_maxdepth(tmp_path):
 
 def test_returns_none_when_absent(tmp_path):
     assert find_manifest(tmp_path) is None
+
+
+from iterm_favicon.manifest import first_png
+
+
+def test_first_png_relative_src(tmp_path):
+    m = tmp_path / "site.webmanifest"
+    m.write_text('{"icons":[{"src":"icons/a.png"}]}')
+    assert first_png(m) == (tmp_path / "icons" / "a.png").resolve()
+
+
+def test_first_png_web_absolute_src(tmp_path):
+    m = tmp_path / "site.webmanifest"
+    m.write_text('{"icons":[{"src":"/android-chrome-192.png"}]}')
+    assert first_png(m) == (tmp_path / "android-chrome-192.png").resolve()
+
+
+def test_first_png_skips_non_png(tmp_path):
+    m = tmp_path / "site.webmanifest"
+    m.write_text('{"icons":[{"src":"a.svg"},{"src":"b.png"}]}')
+    assert first_png(m) == (tmp_path / "b.png").resolve()
+
+
+def test_first_png_none_when_no_png(tmp_path):
+    m = tmp_path / "site.webmanifest"
+    m.write_text('{"icons":[{"src":"a.svg"}]}')
+    assert first_png(m) is None
+
+
+def test_first_png_invalid_json(tmp_path):
+    m = tmp_path / "site.webmanifest"
+    m.write_text("{ not json")
+    assert first_png(m) is None
