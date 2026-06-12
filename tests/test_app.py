@@ -145,3 +145,35 @@ def test_clean_removes_orphan_entries(tmp_path):
     assert str(gone.resolve()) in removed
     assert store.read_entry(d["store_dir"], gone.resolve()) is None
     assert store.read_entry(d["store_dir"], alive.resolve()) is not None
+
+
+import subprocess
+import sys
+from pathlib import Path
+
+
+def test_cli_emit_not_a_project_prints_reset(tmp_path):
+    repo = Path(__file__).resolve().parent.parent
+    proc = subprocess.run(
+        [sys.executable, "-m", "iterm_favicon", "emit",
+         "--cwd", str(tmp_path),
+         "--profiles-dir", str(tmp_path / "p"),
+         "--store-dir", str(tmp_path / "s")],
+        cwd=repo, env=dict(os.environ), capture_output=True, text=True,
+    )
+    assert proc.returncode == 0
+    assert "SetProfile=Default" in proc.stdout
+
+
+def test_cli_rename_prints_title(tmp_path):
+    repo = Path(__file__).resolve().parent.parent
+    (tmp_path / ".env").write_text("APP_NAME=EnvApp\n")
+    proc = subprocess.run(
+        [sys.executable, "-m", "iterm_favicon", "rename", "dev",
+         "--cwd", str(tmp_path),
+         "--profiles-dir", str(tmp_path / "p"),
+         "--store-dir", str(tmp_path / "s")],
+        cwd=repo, env=dict(os.environ), capture_output=True, text=True,
+    )
+    assert proc.returncode == 0
+    assert "]0;EnvApp | dev\007" in proc.stdout
