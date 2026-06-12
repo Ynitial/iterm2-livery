@@ -24,8 +24,9 @@ herkenbare merkkleur, zonder schreeuwerig te zijn.
   PNG's verwijst; we gebruiken die PNG direct.
 - **Geen daemon / Python-API.** Bewust gekozen voor de lichtste vorm: een
   zsh-hook + een Python-helper die wordt aangeroepen en weer afsluit.
-- Geen ondersteuning voor meerdere favicons per project, geen GUI, geen
-  config-bestand (alles via env-vars).
+- Geen ondersteuning voor meerdere favicons per project, geen GUI. Gedrag wordt
+  gestuurd via env-vars; de per-map-keuzes leven in een centrale store (zie
+  "Per-map store").
 
 ## Achtergrond: wat iTerm2 wel/niet kan (geverifieerd)
 
@@ -65,26 +66,41 @@ manifest zoeken, parsen, PNG→kleur, profiel schrijven, escape-sequences printe
 
 Aanroep-contract (zodat tests geïsoleerd draaien):
 ```
-iterm_favicon.py emit  --cwd <dir> --profiles-dir <dir> --cache-dir <dir>
-iterm_favicon.py clean --profiles-dir <dir> --cache-dir <dir>
+iterm_favicon.py emit     --cwd <dir> --profiles-dir <dir> --store-dir <dir>
+iterm_favicon.py reeval   --cwd <dir> --profiles-dir <dir> --store-dir <dir>
+iterm_favicon.py set-icon <pad> --cwd <dir> --profiles-dir <dir> --store-dir <dir>
+iterm_favicon.py clean    --profiles-dir <dir> --store-dir <dir>
 ```
-`emit` print de escape-sequences naar stdout; de zsh-laag echoot die door naar
-de tab. `--profiles-dir`/`--cache-dir` defaulten naar de echte iTerm2/cache-paden
+- `emit` — leest de store voor de huidige project-root; bij een treffer emit het
+  meteen (snel pad). Bij geen treffer: auto-detecteren, store vullen, emitten.
+- `reeval` — forceert opnieuw afleiden uit de `site.webmanifest` en overschrijft
+  de store-entry voor deze root.
+- `set-icon <pad>` — slaat een handmatig icoon-pad op in de store-entry
+  (overschrijft auto-detectie); kleur wordt uit die PNG afgeleid.
+- `clean` — ruimt verweesde store-entries en profielen op.
+
+`emit` print de escape-sequences naar stdout; de zsh-laag echoot die door naar de
+tab. `--profiles-dir`/`--store-dir` defaulten naar de echte iTerm2/store-paden
 maar zijn override-baar in tests.
 
-## Data-flow per `cd`
+## Data-flow per `cd` (emit)
 
 1. **iTerm2-guard:** is `$TERM_PROGRAM` ongelijk aan `iTerm.app` (bv. SSH,
    Terminal.app)? → niets doen.
 2. **Project-root bepalen:** vanaf `$PWD` omhoog lopen tot de eerste map met
-   `.git` (of de filesystem-wortel). Dit is zowel het zoekgebied als de
-   cache-sleutel — zo werkt het ook vanuit een submap zoals `src/`.
-3. **Cache-check:** kijk in `~/.cache/iterm-favicon/` op sleutel
-   `hash(root) + manifest-mtime`. Hit → meteen de gecachte kleur +
-   `SetProfile` emitten. Klaar.
-4. **Cache-miss:** vanaf de root recursief omlaag zoeken naar `site.webmanifest`
-   met een diepte-limiet (default 6) en pruning van `node_modules`, `.git`,
-   `dist`, `build`, `vendor`. Eerste match wint.
+   `.git` (of de filesystem-wortel als er geen `.git` is). Dit is zowel het
+   zoekgebied als de store-sleutel — zo werkt het ook vanuit een submap zoals
+   `src/`.
+3. **Store-lookup:** is er een store-entry voor deze root
+   (`~/.config/iterm-favicon/dirs/<hash(root)>.json`)?
+   - **Treffer (snelpad):** lees icoon-pad + ruwe dominante kleur uit de store,
+     bereken de gemute tints voor het huidige thema (zie stap 7), zorg dat het
+     profiel up-to-date is, en emit. **Geen manifest-scan, geen `sips`.**
+   - **Geen treffer:** ga door naar auto-detectie (stappen 4–6), schrijf het
+     resultaat naar de store, en emit. Dit gebeurt dus maar één keer per project.
+4. **Auto-detectie — zoeken:** vanaf de root recursief omlaag zoeken naar
+   `site.webmanifest` met een diepte-limiet (default 6) en pruning van
+   `node_modules`, `.git`, `dist`, `build`, `vendor`. Eerste match wint.
 5. **Manifest parsen:** JSON laden → `icons`-array → eerste entry met een
    `.png`-`src`. Het `src`-pad resolven t.o.v. de map van het manifest
    (web-absoluut `/foo.png` → manifest-map + `foo.png`).
@@ -103,18 +119,55 @@ maar zijn override-baar in tests.
    - `tint = kleur × sterkte + bg × (1 − sterkte)`.
    - Twee sterktes: tab (`ITERM_FAVICON_TAB_STRENGTH`, default 0.15) en
      achtergrond (`ITERM_FAVICON_BG_STRENGTH`, default 0.07).
-8. **Profiel genereren/updaten:** schrijf/overschrijf een Dynamic-Profile-JSON
-   `iterm-favicon/<hash>.json` met:
+8. **Store-entry schrijven** (alleen bij auto-detectie of `set-icon`/`reeval`):
+   sla in `dirs/<hash(root)>.json` op: `root`-pad, `icon_path`, ruwe
+   `dominant_color` (RGB), en de bron (`manifest` of `manual`). De gemute tint
+   wordt **niet** opgeslagen — die hangt van het thema af en wordt bij elke
+   `emit` opnieuw berekend.
+9. **Profiel genereren/updaten:** schrijf/overschrijf een Dynamic-Profile-JSON
+   `iterm-favicon/<hash(root)>.json` met:
    - stabiele `Guid` afgeleid van het root-pad (her-bezoek hergebruikt 't profiel);
    - `Name` (bv. `favicon: <projectnaam>`);
    - `Custom Icon Path` → absoluut PNG-pad, `Icon` → custom-modus;
-   - `Tab Color` + `Use Tab Color`, `Background Color` → de gemute tints;
+   - `Tab Color` + `Use Tab Color`, `Background Color` → de gemute tints
+     (berekend voor het huidige thema).
    - `Dynamic Profile Parent Name: "Default"` zodat al het overige geërfd wordt.
-9. **Emitten:** `OSC 1337 ; SetProfile=<Name> ST` (icoon + profiel) plus de
-   `OSC 6 ; 1 ; bg ; …` kleur-codes voor direct effect. Cache wegschrijven.
-10. **Geen manifest gevonden of fout:** switch terug naar het **Default**-profiel
-    en reset de tab-kleur (`OSC 6 ; 1 ; bg ; * ; default ST`). De normale look
-    herstelt zo zodra je een project verlaat.
+
+   Om onnodige profiel-rewrites (en iTerm2-reloads) te vermijden: schrijf alleen
+   als het profiel nog niet bestaat of als het thema sinds de vorige `emit` is
+   gewisseld (laatst gebruikte thema wordt in de store-entry bijgehouden).
+10. **Emitten:** `OSC 1337 ; SetProfile=<Name> ST` (icoon + profiel) plus de
+    `OSC 6 ; 1 ; bg ; …` kleur-codes voor direct effect.
+11. **Geen manifest gevonden of fout (en geen store-entry):** switch terug naar
+    het **Default**-profiel en reset de tab-kleur (`OSC 6 ; 1 ; bg ; * ; default
+    ST`). De normale look herstelt zo zodra je een project zonder favicon
+    binnenloopt.
+
+## Per-map store
+
+De store is de **bron van waarheid** (geen wegwerp-cache met mtime-invalidatie).
+Eenmaal gevuld leest `emit` 'm direct en doet géén manifest-scan meer.
+
+- **Locatie:** `~/.config/iterm-favicon/dirs/<hash(root)>.json`, gekoppeld aan
+  het absolute project-root-pad. Onzichtbaar in je repo's, werkt ook voor
+  niet-git-mappen.
+- **Niveau:** per project-root (omhoog tot `.git`; anders de letterlijke map).
+- **Inhoud per entry:**
+  ```json
+  {
+    "root": "/abs/pad/naar/project",
+    "icon_path": "/abs/pad/naar/icon.png",
+    "dominant_color": [82, 113, 255],
+    "source": "manifest",          // of "manual"
+    "last_theme": "dark"            // voor het vermijden van profiel-rewrites
+  }
+  ```
+- **Wanneer geschreven:** alleen bij eerste auto-detectie, `reeval` of
+  `set-icon`. Een gewone `cd` schrijft nooit (behalve `last_theme` bij een
+  thema-wissel).
+- **Levenscyclus:** `reeval` herberekent uit het manifest; `set-icon` zet
+  `source: "manual"` met een eigen pad; `clean` verwijdert entries waarvan
+  `root` niet meer bestaat (plus hun profiel-bestand).
 
 ## iTerm2-sleutels — verificatiestap (geen gok)
 
@@ -138,7 +191,7 @@ Verwachte waarden (te bevestigen):
 
 ## Error handling
 
-Alles fail-silent; optioneel een logregel naar `~/.cache/iterm-favicon/log` als
+Alles fail-silent; optioneel een logregel naar `~/.config/iterm-favicon/log` als
 `ITERM_FAVICON_LOG=1`. Concrete gevallen:
 - Kapotte/ongeldige JSON → skip, reset naar Default.
 - `icons` leeg of geen PNG → skip, reset naar Default.
@@ -148,9 +201,9 @@ Alles fail-silent; optioneel een logregel naar `~/.cache/iterm-favicon/log` als
 
 ## Profiel-opruiming
 
-Commando `iterm-favicon clean`: verwijdert gegenereerde Dynamic-Profile-bestanden
-waarvan het bron-pad/manifest niet meer bestaat (en hun cache-entries). Handmatig,
-niet automatisch.
+Commando `iterm-favicon clean`: verwijdert store-entries waarvan het `root`-pad
+niet meer bestaat, plus de bijbehorende gegenereerde Dynamic-Profile-bestanden.
+Handmatig, niet automatisch.
 
 ## Configuratie (env-vars)
 
@@ -159,17 +212,29 @@ niet automatisch.
 | `ITERM_FAVICON_TAB_STRENGTH` | `0.15` | Blend-sterkte tab-kleur |
 | `ITERM_FAVICON_BG_STRENGTH` | `0.07` | Blend-sterkte terminal-achtergrond |
 | `ITERM_FAVICON_MAXDEPTH` | `6` | Max zoekdiepte vanaf project-root |
-| `ITERM_FAVICON_LOG` | (uit) | `1` = logregels naar cache-log |
+| `ITERM_FAVICON_LOG` | (uit) | `1` = logregels naar `~/.config/iterm-favicon/log` |
 
 ## Testen (TDD)
 
-De Python-helper is het testbare hart; cwd + profiles-dir + cache-dir zijn
+De Python-helper is het testbare hart; cwd + profiles-dir + store-dir zijn
 parameters zodat tests geïsoleerd in tmp-mappen draaien.
 
 Fixture-scenario's:
-- **Geldig:** map met `site.webmanifest` + PNG → asserten: juiste PNG gekozen,
-  pad correct geresolved, plausibele dominante kleur, geldige profiel-JSON
-  geschreven, verwachte escape-sequences geprint.
+- **Geldig (eerste keer):** map met `site.webmanifest` + PNG → asserten: juiste
+  PNG gekozen, pad correct geresolved, plausibele dominante kleur, **store-entry
+  geschreven**, geldige profiel-JSON geschreven, verwachte escape-sequences.
+- **Store-treffer (snelpad):** tweede `emit` met bestaande store-entry →
+  asserten dat er **geen** manifest-scan/`sips` draait (bv. manifest verwijderd
+  maar entry intact → emit werkt nog steeds uit de store).
+- **`reeval`:** wijzig manifest/PNG, draai `reeval` → store-entry + kleur
+  bijgewerkt.
+- **`set-icon <pad>`:** zet handmatig pad → store-entry krijgt `source: manual`,
+  kleur afgeleid uit die PNG, `reeval`/`emit` respecteren de handmatige bron tot
+  een volgende `set-icon`/`reeval`.
+- **Thema-wissel:** zelfde entry, ander `AppleInterfaceStyle` → profiel
+  herschreven met nieuwe tints; gelijk thema → profiel **niet** herschreven.
+- **`clean`:** entry met niet-bestaand `root` → entry + profiel verwijderd;
+  bestaande root blijft staan.
 - **Submap:** `cd` in `src/` met manifest in `public/` → vindt 't via root-walk.
 - **Kapotte JSON** → reset-naar-Default-pad, geen crash.
 - **Geen PNG in `icons`** → reset-pad.
