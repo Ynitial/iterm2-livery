@@ -16,7 +16,7 @@ def main(argv=None):
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("emit", parents=[common])
     sub.add_parser("scan", parents=[common])
-    p_set = sub.add_parser("set-icon", parents=[common])
+    p_set = sub.add_parser("icon", parents=[common])
     p_set.add_argument("path")
     p_ren = sub.add_parser("rename", parents=[common])
     p_ren.add_argument("name", nargs="?", default="")
@@ -32,7 +32,7 @@ def main(argv=None):
         sys.stdout.write(app.cmd_emit(cwd=a.cwd, **dirs, **sess))
     elif a.cmd == "scan":
         sys.stdout.write(app.cmd_scan(cwd=a.cwd, **dirs, **sess))
-    elif a.cmd == "set-icon":
+    elif a.cmd == "icon":
         sys.stdout.write(app.cmd_set_icon(a.path, cwd=a.cwd, **dirs, **sess))
     elif a.cmd == "rename":
         sys.stdout.write(app.cmd_rename(a.name, cwd=a.cwd, project=a.project, **dirs, **sess))

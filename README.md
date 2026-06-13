@@ -48,10 +48,10 @@ Default-profiel, dus de terminal volgt gewoon dark/light mode.
 
 | Commando | Wat het doet |
 |----------|--------------|
-| `livery rename <naam>` | Geeft **deze tab** een eigen naam (per tab). Twee tabs in dezelfde map kunnen elk een andere naam hebben. |
+| `livery rename <naam>` · `livery rn <naam>` | Geeft **deze tab** een eigen naam (per tab). Twee tabs in dezelfde map kunnen elk een andere naam hebben. |
 | `livery rename -p <naam>` | Hernoemt het **hele project** (de profielnaam; geldt voor alle tabs in de map). `--project` mag ook. |
+| `livery icon <pad>` | Stel handmatig een icoon-PNG in (werkt ook zonder manifest). |
 | `livery scan` | Leest de favicon/naam opnieuw in (na een logo- of naamswijziging). |
-| `livery set-icon <pad>` | Stel handmatig een icoon-PNG in (werkt ook zonder manifest). |
 | `livery clean` | Ruimt profielen/cache op van projecten die niet meer bestaan. |
 
 Een leeg argument wist de naam. De tab toont **projectnaam — tabnaam** (iTerm's "Profile &
