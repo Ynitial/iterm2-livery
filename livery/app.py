@@ -69,6 +69,11 @@ def _emit(entry, theme):
     return out
 
 
+def _bare(root):
+    """Niet-project-map: toon de mapnaam als titel + default-look (geen store-entry)."""
+    return escapes.title(Path(root).name) + escapes.default_look()
+
+
 def cmd_emit(cwd, profiles_dir, store_dir):
     root = find_project_root(cwd)
     theme = detect_theme()
@@ -77,14 +82,14 @@ def cmd_emit(cwd, profiles_dir, store_dir):
     if entry is None:
         entry = _detect(root)
         if entry is None:
-            return escapes.reset()
+            return _bare(root)
         entry["last_theme"] = theme
         store.write_entry(store_dir, root, entry)
         _ensure_profile(profiles_dir, entry, theme)
         return _emit(entry, theme)
 
     if entry.get("icon_path") and not Path(entry["icon_path"]).exists():
-        return escapes.reset()
+        return _bare(root)
 
     needs_profile = entry.get("icon_path") and not profile_file(profiles_dir, root).exists()
     if entry.get("last_theme") != theme or needs_profile:
@@ -100,7 +105,7 @@ def cmd_reeval(cwd, profiles_dir, store_dir):
     old = store.read_entry(store_dir, root)
     entry = _detect(root)
     if entry is None:
-        return escapes.reset()
+        return _bare(root)
     if old and old.get("custom_name"):
         entry["custom_name"] = old["custom_name"]
     entry["last_theme"] = theme

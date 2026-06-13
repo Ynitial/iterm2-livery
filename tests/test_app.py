@@ -8,10 +8,12 @@ def _dirs(tmp_path):
     return {"profiles_dir": tmp_path / "profiles", "store_dir": tmp_path / "store"}
 
 
-def test_emit_not_a_project_returns_reset(tmp_path, monkeypatch):
+def test_emit_not_a_project_shows_dirname(tmp_path, monkeypatch):
     monkeypatch.setattr(app, "detect_theme", lambda: "dark")
     out = app.cmd_emit(cwd=tmp_path, **_dirs(tmp_path))
-    assert out == escapes.reset()
+    # Niet-project: mapnaam als titel + default-look, geen store-entry.
+    assert out == escapes.title(tmp_path.resolve().name) + escapes.default_look()
+    assert app.store.read_entry(_dirs(tmp_path)["store_dir"], tmp_path.resolve()) is None
 
 
 def test_emit_manifest_sets_icon_color_and_title(tmp_path, make_png, monkeypatch):
@@ -67,7 +69,7 @@ def test_emit_uses_store_without_rescanning(tmp_path, make_png, monkeypatch):
     assert "SetProfile=livery:" in out
 
 
-def test_emit_missing_icon_file_resets(tmp_path, monkeypatch):
+def test_emit_missing_icon_file_falls_back_to_dirname(tmp_path, monkeypatch):
     monkeypatch.setattr(app, "detect_theme", lambda: "dark")
     d = _dirs(tmp_path)
     store.write_entry(d["store_dir"], tmp_path.resolve(), {
@@ -76,7 +78,7 @@ def test_emit_missing_icon_file_resets(tmp_path, monkeypatch):
         "source": "manifest", "last_theme": "dark",
     })
     out = app.cmd_emit(cwd=tmp_path, **d)
-    assert out == escapes.reset()
+    assert out == escapes.title(tmp_path.resolve().name) + escapes.default_look()
 
 
 def test_reeval_overwrites_entry_keeps_custom(tmp_path, make_png, monkeypatch):

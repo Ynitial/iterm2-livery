@@ -3,7 +3,13 @@ from pathlib import Path
 from livery.manifest import find_manifest
 
 
-def test_finds_manifest_in_subdir(tmp_path):
+def test_finds_manifest_in_root(tmp_path):
+    m = tmp_path / "site.webmanifest"
+    m.write_text("{}")
+    assert find_manifest(tmp_path) == m
+
+
+def test_finds_manifest_in_public(tmp_path):
     pub = tmp_path / "public"
     pub.mkdir()
     m = pub / "site.webmanifest"
@@ -11,19 +17,29 @@ def test_finds_manifest_in_subdir(tmp_path):
     assert find_manifest(tmp_path) == m
 
 
-def test_prunes_node_modules(tmp_path):
+def test_no_deep_search_without_git(tmp_path):
+    # Diep manifest, geen .git -> map wordt NIET afgestruind.
+    deep = tmp_path / "a" / "b" / "c"
+    deep.mkdir(parents=True)
+    (deep / "site.webmanifest").write_text("{}")
+    assert find_manifest(tmp_path) is None
+
+
+def test_deep_search_with_git(tmp_path):
+    (tmp_path / ".git").mkdir()
+    deep = tmp_path / "a" / "b" / "c"
+    deep.mkdir(parents=True)
+    m = deep / "site.webmanifest"
+    m.write_text("{}")
+    assert find_manifest(tmp_path) == m
+
+
+def test_prunes_node_modules_even_with_git(tmp_path):
+    (tmp_path / ".git").mkdir()
     nm = tmp_path / "node_modules" / "pkg"
     nm.mkdir(parents=True)
     (nm / "site.webmanifest").write_text("{}")
     assert find_manifest(tmp_path) is None
-
-
-def test_respects_maxdepth(tmp_path):
-    deep = tmp_path / "a" / "b" / "c"
-    deep.mkdir(parents=True)
-    (deep / "site.webmanifest").write_text("{}")
-    assert find_manifest(tmp_path, maxdepth=1) is None
-    assert find_manifest(tmp_path, maxdepth=6) == deep / "site.webmanifest"
 
 
 def test_returns_none_when_absent(tmp_path):
