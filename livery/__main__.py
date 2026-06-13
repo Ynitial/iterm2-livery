@@ -13,7 +13,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(prog="livery", parents=[common])
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("emit", parents=[common])
-    sub.add_parser("reeval", parents=[common])
+    sub.add_parser("scan", parents=[common])
     p_set = sub.add_parser("set-icon", parents=[common])
     p_set.add_argument("path")
     p_ren = sub.add_parser("rename", parents=[common])
@@ -25,8 +25,8 @@ def main(argv=None):
 
     if a.cmd == "emit":
         sys.stdout.write(app.cmd_emit(cwd=a.cwd, **dirs))
-    elif a.cmd == "reeval":
-        sys.stdout.write(app.cmd_reeval(cwd=a.cwd, **dirs))
+    elif a.cmd == "scan":
+        sys.stdout.write(app.cmd_scan(cwd=a.cwd, **dirs))
     elif a.cmd == "set-icon":
         sys.stdout.write(app.cmd_set_icon(a.path, cwd=a.cwd, **dirs))
     elif a.cmd == "rename":

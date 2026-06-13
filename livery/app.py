@@ -95,7 +95,7 @@ def cmd_emit(cwd, profiles_dir, store_dir):
     return _emit(entry, theme)
 
 
-def cmd_reeval(cwd, profiles_dir, store_dir):
+def cmd_scan(cwd, profiles_dir, store_dir):
     root = find_project_root(cwd)
     theme = detect_theme()
     old = store.read_entry(store_dir, root)

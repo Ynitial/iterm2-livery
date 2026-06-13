@@ -67,14 +67,14 @@ manifest zoeken, parsen, PNG→kleur, profiel schrijven, escape-sequences printe
 Aanroep-contract (zodat tests geïsoleerd draaien):
 ```
 livery.py emit     --cwd <dir> --profiles-dir <dir> --store-dir <dir>
-livery.py reeval   --cwd <dir> --profiles-dir <dir> --store-dir <dir>
+livery.py scan   --cwd <dir> --profiles-dir <dir> --store-dir <dir>
 livery.py set-icon <pad> --cwd <dir> --profiles-dir <dir> --store-dir <dir>
 livery.py rename   [custom] --cwd <dir> --profiles-dir <dir> --store-dir <dir>
 livery.py clean    --profiles-dir <dir> --store-dir <dir>
 ```
 - `emit` — leest de store voor de huidige project-root; bij een treffer emit het
   meteen (snel pad). Bij geen treffer: auto-detecteren, store vullen, emitten.
-- `reeval` — forceert opnieuw afleiden uit de `site.webmanifest` en overschrijft
+- `scan` — forceert opnieuw afleiden uit de `site.webmanifest` en overschrijft
   de store-entry voor deze root (behoudt de `rename`-suffix).
 - `set-icon <pad>` — slaat een handmatig icoon-pad op in de store-entry
   (overschrijft auto-detectie); kleur wordt uit die PNG afgeleid.
@@ -122,7 +122,7 @@ maar zijn override-baar in tests.
    - `tint = kleur × sterkte + bg × (1 − sterkte)`.
    - Twee sterktes: tab (`LIVERY_TAB_STRENGTH`, default 0.15) en
      achtergrond (`LIVERY_BG_STRENGTH`, default 0.07).
-8. **Store-entry schrijven** (alleen bij auto-detectie of `set-icon`/`reeval`):
+8. **Store-entry schrijven** (alleen bij auto-detectie of `set-icon`/`scan`):
    sla in `dirs/<hash(root)>.json` op: `root`-pad, `icon_path`, ruwe
    `dominant_color` (RGB), en de bron (`manifest` of `manual`). De gemute tint
    wordt **niet** opgeslagen — die hangt van het thema af en wordt bij elke
@@ -158,7 +158,7 @@ Naast icoon + kleur krijgt elke themed tab een titel via `OSC 0` (`ESC]0;<titel>
   (geen favicon) → titel + Default-profiel (geen icoon/kleur). Geen van beide →
   volledige reset.
 - **`rename`:** zet `custom_name`; de getoonde titel wordt `"<name> | <custom_name>"`.
-  `reeval`/`set-icon` behouden de `custom_name`.
+  `scan`/`set-icon` behouden de `custom_name`.
 - **Reset:** bij een niet-themed map wordt de titel gewist (`ESC]0;BEL`) naast de
   profiel/kleur-reset. (Titel-persistentie t.o.v. een prompt die de titel
   herschrijft wordt in de E2E geverifieerd.)
@@ -184,10 +184,10 @@ Eenmaal gevuld leest `emit` 'm direct en doet géén manifest-scan meer.
     "last_theme": "dark"                      // voor het vermijden van profiel-rewrites
   }
   ```
-- **Wanneer geschreven:** alleen bij eerste auto-detectie, `reeval` of
+- **Wanneer geschreven:** alleen bij eerste auto-detectie, `scan` of
   `set-icon`. Een gewone `cd` schrijft nooit (behalve `last_theme` bij een
   thema-wissel).
-- **Levenscyclus:** `reeval` herberekent uit het manifest; `set-icon` zet
+- **Levenscyclus:** `scan` herberekent uit het manifest; `set-icon` zet
   `source: "manual"` met een eigen pad; `clean` verwijdert entries waarvan
   `root` niet meer bestaat (plus hun profiel-bestand).
 
@@ -248,11 +248,11 @@ Fixture-scenario's:
 - **Store-treffer (snelpad):** tweede `emit` met bestaande store-entry →
   asserten dat er **geen** manifest-scan/`sips` draait (bv. manifest verwijderd
   maar entry intact → emit werkt nog steeds uit de store).
-- **`reeval`:** wijzig manifest/PNG, draai `reeval` → store-entry + kleur
+- **`scan`:** wijzig manifest/PNG, draai `scan` → store-entry + kleur
   bijgewerkt.
 - **`set-icon <pad>`:** zet handmatig pad → store-entry krijgt `source: manual`,
-  kleur afgeleid uit die PNG, `reeval`/`emit` respecteren de handmatige bron tot
-  een volgende `set-icon`/`reeval`.
+  kleur afgeleid uit die PNG, `scan`/`emit` respecteren de handmatige bron tot
+  een volgende `set-icon`/`scan`.
 - **Thema-wissel:** zelfde entry, ander `AppleInterfaceStyle` → profiel
   herschreven met nieuwe tints; gelijk thema → profiel **niet** herschreven.
 - **`clean`:** entry met niet-bestaand `root` → entry + profiel verwijderd;

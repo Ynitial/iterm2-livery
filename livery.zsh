@@ -19,11 +19,11 @@ livery() {
   [[ "$TERM_PROGRAM" == "iTerm.app" ]] || { echo "livery: alleen in iTerm2"; return 1; }
   local out
   case "$1" in
-    reeval)   out="$(_livery_py reeval --cwd "$PWD")" ;;
+    scan)   out="$(_livery_py scan --cwd "$PWD")" ;;
     set-icon) out="$(_livery_py set-icon "$2" --cwd "$PWD")" ;;
     rename)   out="$(_livery_py rename "$2" --cwd "$PWD")" ;;
     clean)    _livery_py clean; return 0 ;;
-    *) echo "usage: livery {reeval|set-icon <pad>|rename [naam]|clean}"; return 1 ;;
+    *) echo "usage: livery {scan|set-icon <pad>|rename [naam]|clean}"; return 1 ;;
   esac
   print -rn -- "$out"
 }

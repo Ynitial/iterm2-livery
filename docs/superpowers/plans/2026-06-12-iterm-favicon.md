@@ -4,7 +4,7 @@
 
 **Goal:** Een zsh-schil rond iTerm2 die per project-root automatisch de favicon (uit `site.webmanifest`) als tab-icoon zet plus een subtiel gemute tint op tab + terminal-achtergrond, opgeslagen in een persistente per-root store.
 
-**Architecture:** Een dunne zsh-laag (`chpwd`/startup hook + `livery` commando) roept een Python-pakket aan. Het Python-pakket leest een persistente store als bron van waarheid; alleen bij eerste detectie, `reeval` of `set-icon` doet het de dure afleiding (manifest zoeken → eerste PNG → dominante kleur via `sips`→BMP). Een Dynamic Profile per root draagt het icoon + de kleuren; switchen gebeurt via een `SetProfile`-escape-code.
+**Architecture:** Een dunne zsh-laag (`chpwd`/startup hook + `livery` commando) roept een Python-pakket aan. Het Python-pakket leest een persistente store als bron van waarheid; alleen bij eerste detectie, `scan` of `set-icon` doet het de dure afleiding (manifest zoeken → eerste PNG → dominante kleur via `sips`→BMP). Een Dynamic Profile per root draagt het icoon + de kleuren; switchen gebeurt via een `SetProfile`-escape-code.
 
 **Tech Stack:** zsh, Python 3 (stdlib only: `json`, `os`, `pathlib`, `struct`, `zlib`, `hashlib`, `subprocess`, `argparse`, `collections`), macOS `sips` + `defaults`, iTerm2 Dynamic Profiles. Tests met `pytest`.
 
@@ -17,7 +17,7 @@
 ├── livery.zsh              # zsh-laag: hook + `livery` commando
 ├── livery/                 # Python-pakket (python3 livery <cmd>)
 │   ├── __init__.py
-│   ├── __main__.py                # argparse-dispatch: emit/reeval/set-icon/clean
+│   ├── __main__.py                # argparse-dispatch: emit/scan/set-icon/clean
 │   ├── roots.py                   # find_project_root(cwd)
 │   ├── manifest.py                # find_manifest, first_png, resolve_src
 │   ├── color.py                   # read_bmp, sips_pixels, dominant_color, average_color
@@ -25,7 +25,7 @@
 │   ├── store.py                   # store_path, read_entry, write_entry, iter_entries
 │   ├── profile.py                 # build_profile, write_profile, profile_file, profile_name, profile_guid
 │   ├── escapes.py                 # OSC-sequence strings
-│   └── app.py                     # orchestratie: cmd_emit/cmd_reeval/cmd_set_icon/cmd_clean
+│   └── app.py                     # orchestratie: cmd_emit/cmd_scan/cmd_set_icon/cmd_clean
 ├── tests/
 │   ├── conftest.py                # make_png fixture-helper
 │   ├── test_roots.py
@@ -1119,7 +1119,7 @@ git commit -m "feat: emit orchestration with store fast-path"
 
 ---
 
-## Task 12: `reeval`, `set-icon`, `clean`
+## Task 12: `scan`, `set-icon`, `clean`
 
 **Files:**
 - Modify: `livery/app.py`
@@ -1130,7 +1130,7 @@ git commit -m "feat: emit orchestration with store fast-path"
 
 Append to `tests/test_app.py`:
 ```python
-def test_reeval_overwrites_entry(tmp_path, make_png, monkeypatch):
+def test_scan_overwrites_entry(tmp_path, make_png, monkeypatch):
     monkeypatch.setattr(app, "detect_theme", lambda: "dark")
     d = _dirs(tmp_path)
     (tmp_path / "site.webmanifest").write_text('{"icons":[{"src":"a.png"}]}')
@@ -1140,7 +1140,7 @@ def test_reeval_overwrites_entry(tmp_path, make_png, monkeypatch):
         "dominant_color": [1, 1, 1], "source": "manifest", "last_theme": "dark",
     })
     monkeypatch.setattr(app, "color_from_png", lambda p: (10, 10, 200))
-    app.cmd_reeval(cwd=tmp_path, **d)
+    app.cmd_scan(cwd=tmp_path, **d)
     entry = store.read_entry(d["store_dir"], tmp_path.resolve())
     assert entry["dominant_color"] == [10, 10, 200]
     assert entry["icon_path"].endswith("a.png")
@@ -1175,7 +1175,7 @@ def test_clean_removes_orphan_entries(tmp_path):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python3 -m pytest tests/test_app.py -q`
-Expected: FAIL — `AttributeError: module 'livery.app' has no attribute 'cmd_reeval'`
+Expected: FAIL — `AttributeError: module 'livery.app' has no attribute 'cmd_scan'`
 
 - [ ] **Step 3: Voeg een delete-helper toe aan de store**
 
@@ -1194,7 +1194,7 @@ Append to `livery/app.py`:
 from livery.profile import profile_guid
 
 
-def cmd_reeval(cwd, profiles_dir, store_dir):
+def cmd_scan(cwd, profiles_dir, store_dir):
     root = find_project_root(cwd)
     theme = detect_theme()
     png = _autodetect(root)
@@ -1248,7 +1248,7 @@ Expected: PASS (7 passed)
 
 ```bash
 git add livery/app.py livery/store.py tests/test_app.py
-git commit -m "feat: reeval, set-icon and clean commands"
+git commit -m "feat: scan, set-icon and clean commands"
 ```
 
 ---
@@ -1305,7 +1305,7 @@ def main(argv=None):
     parser.add_argument("--store-dir", default=str(app.DEFAULT_STORE))
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("emit")
-    sub.add_parser("reeval")
+    sub.add_parser("scan")
     p_set = sub.add_parser("set-icon")
     p_set.add_argument("path")
     sub.add_parser("clean")
@@ -1315,8 +1315,8 @@ def main(argv=None):
 
     if a.cmd == "emit":
         sys.stdout.write(app.cmd_emit(cwd=a.cwd, **dirs))
-    elif a.cmd == "reeval":
-        sys.stdout.write(app.cmd_reeval(cwd=a.cwd, **dirs))
+    elif a.cmd == "scan":
+        sys.stdout.write(app.cmd_scan(cwd=a.cwd, **dirs))
     elif a.cmd == "set-icon":
         sys.stdout.write(app.cmd_set_icon(a.path, cwd=a.cwd, **dirs))
     elif a.cmd == "clean":
@@ -1367,10 +1367,10 @@ _livery_run() {
 livery() {
   [[ "$TERM_PROGRAM" == "iTerm.app" ]] || { echo "livery: alleen in iTerm2"; return 1; }
   case "$1" in
-    reeval)   python3 "$LIVERY_DIR/livery" reeval --cwd "$PWD" ;;
+    scan)   python3 "$LIVERY_DIR/livery" scan --cwd "$PWD" ;;
     set-icon) python3 "$LIVERY_DIR/livery" set-icon "$2" --cwd "$PWD" ;;
     clean)    python3 "$LIVERY_DIR/livery" clean ;;
-    *) echo "usage: livery {reeval|set-icon <pad>|clean}"; return 1 ;;
+    *) echo "usage: livery {scan|set-icon <pad>|clean}"; return 1 ;;
   esac
 }
 
@@ -1379,7 +1379,7 @@ add-zsh-hook chpwd _livery_run
 _livery_run   # bij startup
 ```
 
-> Noot: `reeval`/`set-icon` printen zelf de escape-sequences (ze retourneren die
+> Noot: `scan`/`set-icon` printen zelf de escape-sequences (ze retourneren die
 > uit `app.py`), dus de tab update meteen. `clean` print niets naar de tab.
 
 - [ ] **Step 2: Smoke-test de syntaxis**
@@ -1426,7 +1426,7 @@ project waarin je staat, op basis van `site.webmanifest`.
 
 ## Commando's
 
-- `livery reeval` — opnieuw afleiden uit `site.webmanifest`.
+- `livery scan` — opnieuw afleiden uit `site.webmanifest`.
 - `livery set-icon <pad>` — handmatig icoon-pad instellen (ook zonder manifest).
 - `livery clean` — verweesde profielen/store-entries opruimen.
 
@@ -1485,14 +1485,14 @@ Run:
 cd /tmp                 # geen manifest -> terug naar Default-look
 cd -                    # weer het project -> snelpad uit store
 livery set-icon ~/pad/naar/eigen-logo.png   # handmatig icoon
-livery reeval                                # weer uit manifest
+livery scan                                # weer uit manifest
 ```
-Expected: tab volgt elke keer; `set-icon` toont jouw logo; `reeval` herstelt het manifest-icoon.
+Expected: tab volgt elke keer; `set-icon` toont jouw logo; `scan` herstelt het manifest-icoon.
 
 - [ ] **Step 5 (indien nodig): stem de sterktes af**
 
 Vind je de tint te sterk/zwak: zet bijv. `export LIVERY_TAB_STRENGTH=0.10`
-in `~/.zshrc`, open een nieuwe tab, `livery reeval`.
+in `~/.zshrc`, open een nieuwe tab, `livery scan`.
 
 - [ ] **Step 6: Commit eventuele bevindingen**
 
@@ -1505,9 +1505,9 @@ git add -A && git commit -m "chore: tune defaults after end-to-end check"
 
 ## Self-Review (uitgevoerd bij schrijven)
 
-- **Spec-dekking:** iTerm2-guard (Taak 14), root-walk (2), recursief zoeken+prune+maxdepth (3), eerste PNG + padresolutie (4), dominant + average-fallback (5), sips-pipeline (6), thema + gemute tint tab/bg (7), per-root store als bron van waarheid (8), Dynamic Profile met icoon+kleuren (9), SetProfile+tabkleur+reset escapes (10), emit-snelpad (11), reeval/set-icon/clean (12), CLI (13), zsh-hook+commando (14), README/config (15), E2E (16), sleutel-verificatie (0). Alle spec-secties gedekt.
+- **Spec-dekking:** iTerm2-guard (Taak 14), root-walk (2), recursief zoeken+prune+maxdepth (3), eerste PNG + padresolutie (4), dominant + average-fallback (5), sips-pipeline (6), thema + gemute tint tab/bg (7), per-root store als bron van waarheid (8), Dynamic Profile met icoon+kleuren (9), SetProfile+tabkleur+reset escapes (10), emit-snelpad (11), scan/set-icon/clean (12), CLI (13), zsh-hook+commando (14), README/config (15), E2E (16), sleutel-verificatie (0). Alle spec-secties gedekt.
 - **Placeholders:** geen TBD/TODO; alle code-stappen bevatten volledige code.
-- **Type-consistentie:** functienamen consistent over taken (`find_project_root`, `find_manifest`/`first_png`, `dominant_color`/`average_color`/`color_from_png`/`sips_pixels`, `detect_theme`/`mute`, `store_path`/`read_entry`/`write_entry`/`iter_entries`/`delete_entry`, `build_profile`/`write_profile`/`profile_file`/`profile_guid`/`profile_name`, `set_profile`/`tab_color`/`reset`, `cmd_emit`/`cmd_reeval`/`cmd_set_icon`/`cmd_clean`/`_ensure_profile`/`_autodetect`/`_emit_for`). `app.detect_theme` en `app.color_from_png` zijn als module-attributen geïmporteerd zodat tests ze kunnen monkeypatchen.
+- **Type-consistentie:** functienamen consistent over taken (`find_project_root`, `find_manifest`/`first_png`, `dominant_color`/`average_color`/`color_from_png`/`sips_pixels`, `detect_theme`/`mute`, `store_path`/`read_entry`/`write_entry`/`iter_entries`/`delete_entry`, `build_profile`/`write_profile`/`profile_file`/`profile_guid`/`profile_name`, `set_profile`/`tab_color`/`reset`, `cmd_emit`/`cmd_scan`/`cmd_set_icon`/`cmd_clean`/`_ensure_profile`/`_autodetect`/`_emit_for`). `app.detect_theme` en `app.color_from_png` zijn als module-attributen geïmporteerd zodat tests ze kunnen monkeypatchen.
 ```
 
 ---
@@ -1922,13 +1922,13 @@ git add livery/app.py tests/test_app.py
 git commit -m "feat: emit orchestration with title + env-only theming"
 ```
 
-## Task 12 (REVISED): `reeval`, `set-icon`, `rename`, `clean`
+## Task 12 (REVISED): `scan`, `set-icon`, `rename`, `clean`
 
 **Files:** Modify `livery/app.py`, `livery/store.py`, `tests/test_app.py`
 
 - [ ] **Step 1: failing test** — APPEND to `tests/test_app.py`:
 ```python
-def test_reeval_overwrites_entry_keeps_custom(tmp_path, make_png, monkeypatch):
+def test_scan_overwrites_entry_keeps_custom(tmp_path, make_png, monkeypatch):
     monkeypatch.setattr(app, "detect_theme", lambda: "dark")
     d = _dirs(tmp_path)
     (tmp_path / "site.webmanifest").write_text('{"name":"Slow","icons":[{"src":"a.png"}]}')
@@ -1939,7 +1939,7 @@ def test_reeval_overwrites_entry_keeps_custom(tmp_path, make_png, monkeypatch):
         "source": "manifest", "last_theme": "dark",
     })
     monkeypatch.setattr(app, "color_from_png", lambda p: (10, 10, 200))
-    app.cmd_reeval(cwd=tmp_path, **d)
+    app.cmd_scan(cwd=tmp_path, **d)
     entry = store.read_entry(d["store_dir"], tmp_path.resolve())
     assert entry["dominant_color"] == [10, 10, 200]
     assert entry["icon_path"].endswith("a.png")
@@ -1996,7 +1996,7 @@ def test_clean_removes_orphan_entries(tmp_path):
     assert store.read_entry(d["store_dir"], alive.resolve()) is not None
 ```
 
-- [ ] **Step 2: verify fail** — `python3 -m pytest tests/test_app.py -q` → FAIL (AttributeError: module 'livery.app' has no attribute 'cmd_reeval').
+- [ ] **Step 2: verify fail** — `python3 -m pytest tests/test_app.py -q` → FAIL (AttributeError: module 'livery.app' has no attribute 'cmd_scan').
 
 - [ ] **Step 3: store delete helper** — APPEND to `livery/store.py`:
 ```python
@@ -2011,7 +2011,7 @@ def delete_entry(store_dir, root):
 from livery.profile import profile_guid
 
 
-def cmd_reeval(cwd, profiles_dir, store_dir):
+def cmd_scan(cwd, profiles_dir, store_dir):
     root = find_project_root(cwd)
     theme = detect_theme()
     old = store.read_entry(store_dir, root)
@@ -2074,7 +2074,7 @@ def cmd_clean(profiles_dir, store_dir):
 - [ ] **Step 6: commit**
 ```bash
 git add livery/app.py livery/store.py tests/test_app.py
-git commit -m "feat: reeval, set-icon, rename and clean commands"
+git commit -m "feat: scan, set-icon, rename and clean commands"
 ```
 
 ## Task 13 (REVISED): CLI-dispatch (incl. `rename`)
@@ -2132,7 +2132,7 @@ def main(argv=None):
     parser.add_argument("--store-dir", default=str(app.DEFAULT_STORE))
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("emit")
-    sub.add_parser("reeval")
+    sub.add_parser("scan")
     p_set = sub.add_parser("set-icon")
     p_set.add_argument("path")
     p_ren = sub.add_parser("rename")
@@ -2144,8 +2144,8 @@ def main(argv=None):
 
     if a.cmd == "emit":
         sys.stdout.write(app.cmd_emit(cwd=a.cwd, **dirs))
-    elif a.cmd == "reeval":
-        sys.stdout.write(app.cmd_reeval(cwd=a.cwd, **dirs))
+    elif a.cmd == "scan":
+        sys.stdout.write(app.cmd_scan(cwd=a.cwd, **dirs))
     elif a.cmd == "set-icon":
         sys.stdout.write(app.cmd_set_icon(a.path, cwd=a.cwd, **dirs))
     elif a.cmd == "rename":
@@ -2195,11 +2195,11 @@ livery() {
   [[ "$TERM_PROGRAM" == "iTerm.app" ]] || { echo "livery: alleen in iTerm2"; return 1; }
   local out
   case "$1" in
-    reeval)   out="$(_livery_py reeval --cwd "$PWD")" ;;
+    scan)   out="$(_livery_py scan --cwd "$PWD")" ;;
     set-icon) out="$(_livery_py set-icon "$2" --cwd "$PWD")" ;;
     rename)   out="$(_livery_py rename "$2" --cwd "$PWD")" ;;
     clean)    _livery_py clean; return 0 ;;
-    *) echo "usage: livery {reeval|set-icon <pad>|rename [naam]|clean}"; return 1 ;;
+    *) echo "usage: livery {scan|set-icon <pad>|rename [naam]|clean}"; return 1 ;;
   esac
   print -rn -- "$out"
 }
@@ -2209,7 +2209,7 @@ add-zsh-hook chpwd _livery_run
 _livery_run   # bij startup
 ```
 
-> `reeval`/`set-icon`/`rename` retourneren de escape-sequences uit `app.py`, dus
+> `scan`/`set-icon`/`rename` retourneren de escape-sequences uit `app.py`, dus
 > de tab werkt meteen bij. `clean` print alleen status (stderr) en raakt de tab niet.
 
 - [ ] **Step 2: smoke-test syntaxis** — `zsh -n livery.zsh && echo OK` → `OK`.
@@ -2229,5 +2229,5 @@ git commit -m "feat: zsh hook layer with chpwd + livery command (incl rename)"
 - [ ] **Step 3: manifest-project** — `cd` naar een webproject met `site.webmanifest`: tab krijgt icoon + tint + titel (manifest-naam). Check `~/.config/livery/dirs/` en de DynamicProfiles-map.
 - [ ] **Step 4: env-only + titel-persistentie** — `cd` naar een map met alleen `.env` (met `APP_NAME`): tab krijgt de titel maar geen custom icoon. **Belangrijk:** controleer of de titel blijft staan na een paar prompts; als je zsh-config de titel in `precmd` herschrijft, los dat op (bv. de hook ná je titel-setter laten draaien, of de titel-setter uitschakelen).
 - [ ] **Step 5: rename + reset** — `livery rename dev` → titel wordt `<Naam> | dev`; `livery rename` (leeg) → suffix weg; `cd /tmp` (geen manifest/env) → reset.
-- [ ] **Step 6: sterktes afstemmen** (optioneel) — `export LIVERY_TAB_STRENGTH=0.10` etc., nieuwe tab, `livery reeval`.
+- [ ] **Step 6: sterktes afstemmen** (optioneel) — `export LIVERY_TAB_STRENGTH=0.10` etc., nieuwe tab, `livery scan`.
 - [ ] **Step 7: commit eventuele tuning.**

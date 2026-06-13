@@ -81,7 +81,7 @@ def test_emit_missing_icon_file_falls_back_to_dirname(tmp_path, monkeypatch):
     assert out == escapes.title(tmp_path.resolve().name) + escapes.default_look()
 
 
-def test_reeval_overwrites_entry_keeps_custom(tmp_path, make_png, monkeypatch):
+def test_scan_overwrites_entry_keeps_custom(tmp_path, make_png, monkeypatch):
     monkeypatch.setattr(app, "detect_theme", lambda: "dark")
     d = _dirs(tmp_path)
     (tmp_path / "site.webmanifest").write_text('{"name":"Slow","icons":[{"src":"a.png"}]}')
@@ -92,7 +92,7 @@ def test_reeval_overwrites_entry_keeps_custom(tmp_path, make_png, monkeypatch):
         "source": "manifest", "last_theme": "dark",
     })
     monkeypatch.setattr(app, "color_from_png", lambda p: (10, 10, 200))
-    app.cmd_reeval(cwd=tmp_path, **d)
+    app.cmd_scan(cwd=tmp_path, **d)
     entry = store.read_entry(d["store_dir"], tmp_path.resolve())
     assert entry["dominant_color"] == [10, 10, 200]
     assert entry["icon_path"].endswith("a.png")

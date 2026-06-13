@@ -65,7 +65,7 @@ lager (blendt dan richting je thema-achtergrond).
 
 | Commando | Effect |
 |----------|--------|
-| `livery reeval` | Opnieuw afleiden uit `site.webmanifest` (behoudt je `rename`-suffix) |
+| `livery scan` | Opnieuw afleiden uit `site.webmanifest` (behoudt je `rename`-suffix) |
 | `livery set-icon <pad>` | Handmatig icoon-pad instellen (werkt ook zonder manifest) |
 | `livery rename <naam>` | Titel wordt `<Naam> \| <naam>`; zonder argument wist het de suffix |
 | `livery clean` | Verweesde profielen/store-entries opruimen |
