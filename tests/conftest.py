@@ -1,8 +1,12 @@
+import os
 import struct
 import zlib
 from pathlib import Path
 
 import pytest
+
+# Geen kunstmatige profiel-laad-pauze tijdens tests.
+os.environ.setdefault("LIVERY_PROFILE_DELAY", "0")
 
 
 def _make_png(path, rgb, w=16, h=16):

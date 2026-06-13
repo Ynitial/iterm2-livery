@@ -1,4 +1,5 @@
 import os
+import time
 from pathlib import Path
 
 from livery import escapes, store
@@ -22,6 +23,12 @@ def _tab_strength():
 
 def _maxdepth():
     return int(os.environ.get("LIVERY_MAXDEPTH", "6"))
+
+
+def _profile_delay():
+    # Korte pauze ná het schrijven van een nieuw profiel, zodat iTerm2 het inlaadt
+    # vóór de SetProfile-switch (anders mist het icoon bij het eerste bezoek).
+    return float(os.environ.get("LIVERY_PROFILE_DELAY", "0.3"))
 
 
 def _detect(root, force=False):
@@ -54,6 +61,7 @@ def _ensure_profile(profiles_dir, entry, theme):
     tab = mute(rgb, theme, _tab_strength())
     colors = default_color_settings()
     write_profile(profiles_dir, build_profile(entry["root"], entry["icon_path"], tab, colors))
+    time.sleep(_profile_delay())  # geef iTerm2 tijd om het profiel in te laden
 
 
 def _emit(entry, theme):

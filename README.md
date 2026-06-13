@@ -76,6 +76,7 @@ lager (blendt dan richting je thema-achtergrond).
 |-----|---------|--------|
 | `LIVERY_TAB_STRENGTH` | `1.0` | Tabkleur-sterkte (1 = volle merkkleur, 0 = thema-kleur) |
 | `LIVERY_MAXDEPTH` | `6` | Max zoekdiepte bij de recursieve `find` binnen een git-repo |
+| `LIVERY_PROFILE_DELAY` | `0.3` | Pauze (s) ná het schrijven van een nieuw profiel, zodat iTerm2 het inlaadt vóór de switch (alleen bij 1e bezoek). Hoger zetten als 't icoon dán nog mist; 0 om uit te zetten |
 | `LIVERY_LOG` | (uit) | `1` = foutregels naar `~/.config/livery/log` |
 
 ## Opslag
