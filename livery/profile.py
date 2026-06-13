@@ -1,6 +1,31 @@
 import hashlib
 import json
+import plistlib
 from pathlib import Path
+
+ITERM_PREFS = Path.home() / "Library" / "Preferences" / "com.googlecode.iterm2.plist"
+
+# bg/fg-instellingen die we van het Default-profiel overnemen, zodat livery-tabs
+# exact jouw licht/donker-thema volgen (inclusief de "separate colors"-vlag).
+INHERIT_COLOR_KEYS = (
+    "Use Separate Colors for Light and Dark Mode",
+    "Background Color", "Background Color (Light)", "Background Color (Dark)",
+    "Foreground Color", "Foreground Color (Light)", "Foreground Color (Dark)",
+)
+
+
+def default_color_settings(prefs_path=ITERM_PREFS):
+    """Lees bg/fg (licht+donker) van het iTerm2 default-profiel; {} bij fout."""
+    try:
+        with open(prefs_path, "rb") as f:
+            d = plistlib.load(f)
+    except (OSError, ValueError):
+        return {}
+    guid = d.get("Default Bookmark Guid")
+    prof = next((b for b in d.get("New Bookmarks", []) if b.get("Guid") == guid), None)
+    if not prof:
+        return {}
+    return {k: prof[k] for k in INHERIT_COLOR_KEYS if k in prof}
 
 
 def profile_guid(root):
@@ -23,8 +48,8 @@ def _color(rgb):
     }
 
 
-def build_profile(root, icon_path, tab_rgb):
-    return {
+def build_profile(root, icon_path, tab_rgb, color_settings=None):
+    profile = {
         "Name": profile_name(root),
         "Guid": profile_guid(root),
         "Dynamic Profile Parent Name": "Default",
@@ -33,6 +58,9 @@ def build_profile(root, icon_path, tab_rgb):
         "Use Tab Color": True,
         "Tab Color": _color(tab_rgb),
     }
+    if color_settings:
+        profile.update(color_settings)  # neem licht/donker bg+fg van Default over
+    return profile
 
 
 def write_profile(profiles_dir, profile):

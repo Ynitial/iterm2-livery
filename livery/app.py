@@ -4,7 +4,9 @@ from pathlib import Path
 from livery import escapes, store
 from livery.color import color_from_png
 from livery.manifest import find_manifest, first_png
-from livery.profile import build_profile, profile_file, profile_name, write_profile
+from livery.profile import (
+    build_profile, default_color_settings, profile_file, profile_name, write_profile,
+)
 from livery.roots import find_project_root
 from livery.tint import detect_theme, mute
 from livery.title import base_name, tab_title
@@ -50,7 +52,8 @@ def _ensure_profile(profiles_dir, entry, theme):
         return
     rgb = tuple(entry["dominant_color"])
     tab = mute(rgb, theme, _tab_strength())
-    write_profile(profiles_dir, build_profile(entry["root"], entry["icon_path"], tab))
+    colors = default_color_settings()
+    write_profile(profiles_dir, build_profile(entry["root"], entry["icon_path"], tab, colors))
 
 
 def _emit(entry, theme):
