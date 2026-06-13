@@ -6,7 +6,7 @@ from livery import escapes, store
 from livery.color import color_from_png
 from livery.manifest import find_manifest, first_png
 from livery.profile import (
-    build_profile, default_color_settings, profile_file, profile_name, write_profile,
+    build_profile, default_inherited_settings, profile_file, profile_name, write_profile,
 )
 from livery.roots import find_project_root
 from livery.tint import detect_theme, mute
@@ -59,20 +59,24 @@ def _ensure_profile(profiles_dir, entry, theme):
         return
     rgb = tuple(entry["dominant_color"])
     tab = mute(rgb, theme, _tab_strength())
-    colors = default_color_settings()
+    colors = default_inherited_settings()
     write_profile(profiles_dir, build_profile(entry["root"], entry["icon_path"], tab, colors))
     time.sleep(_profile_delay())  # geef iTerm2 tijd om het profiel in te laden
 
 
 def _emit(entry, theme):
-    """Escape-output: titel + (icoon-profiel + kleur) OF default-look."""
-    out = escapes.title(tab_title(entry["name"], entry.get("custom_name")))
+    """Escape-output: eerst de profiel-switch/kleur, dán de titel.
+
+    De titel komt als laatste, want SetProfile reset de sessienaam — anders zou
+    onze titel wel in de titelbalk maar niet in de tab verschijnen.
+    """
     if entry.get("icon_path") and entry.get("dominant_color"):
         rgb = tuple(entry["dominant_color"])
-        out += escapes.set_profile(profile_name(entry["root"]))
+        out = escapes.set_profile(profile_name(entry["root"]))
         out += escapes.tab_color(mute(rgb, theme, _tab_strength()))
     else:
-        out += escapes.default_look()
+        out = escapes.default_look()
+    out += escapes.title(tab_title(entry["name"], entry.get("custom_name")))
     return out
 
 

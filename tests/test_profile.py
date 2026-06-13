@@ -2,7 +2,7 @@ import json
 import plistlib
 
 from livery.profile import (
-    build_profile, default_color_settings, profile_file, profile_guid,
+    build_profile, default_inherited_settings, profile_file, profile_guid,
     profile_name, write_profile,
 )
 
@@ -23,6 +23,7 @@ def test_build_profile_has_icon_and_tab_color():
     assert p["Use Tab Color"] is True
     assert p["Dynamic Profile Parent Name"] == "Default"
     assert abs(p["Tab Color"]["Red Component"] - 1.0) < 1e-6
+    assert p["Title Components"] == 1  # Session Name -> tab toont onze titel
     # geen achtergrond-tint meer -> erft de standaard-achtergrond
     assert "Background Color" not in p
 
@@ -38,7 +39,7 @@ def test_build_profile_merges_color_settings():
     assert p["Tab Color"]["Red Component"] == 1.0  # tabkleur blijft overschreven
 
 
-def test_default_color_settings_reads_default_profile(tmp_path):
+def test_default_inherited_settings_reads_default_profile(tmp_path):
     prefs = tmp_path / "iterm.plist"
     data = {
         "Default Bookmark Guid": "G1",
@@ -53,15 +54,15 @@ def test_default_color_settings_reads_default_profile(tmp_path):
     }
     with open(prefs, "wb") as f:
         plistlib.dump(data, f)
-    cs = default_color_settings(prefs)
+    cs = default_inherited_settings(prefs)
     assert cs["Use Separate Colors for Light and Dark Mode"] is True
     assert cs["Background Color (Dark)"] == {"Red Component": 0.08}
     assert cs["Foreground Color (Dark)"] == {"Red Component": 0.86}
     assert "Irrelevant Key" not in cs
 
 
-def test_default_color_settings_missing_prefs_returns_empty(tmp_path):
-    assert default_color_settings(tmp_path / "nope.plist") == {}
+def test_default_inherited_settings_missing_prefs_returns_empty(tmp_path):
+    assert default_inherited_settings(tmp_path / "nope.plist") == {}
 
 
 def test_write_profile_wraps_in_profiles_array(tmp_path):
