@@ -5,29 +5,35 @@ import tempfile
 from collections import Counter
 from pathlib import Path
 
-NEAR = 24  # drempel voor "bijna zwart/wit"
+NEAR = 24       # drempel voor "bijna zwart/wit"
+ALPHA_MIN = 8   # pixels transparanter dan dit tellen niet mee (32-bit BMP)
 
 
 def read_bmp(data):
-    """Lees een ongecomprimeerde 24-bit BMP -> lijst (r,g,b), top-down rij-volgorde."""
+    """Lees een ongecomprimeerde 24- of 32-bit BMP -> lijst (r,g,b), top-down.
+
+    Bij 32-bit (BGRA, zoals sips levert voor PNG's met alpha) worden (vrijwel)
+    transparante pixels overgeslagen, zodat alleen het zichtbare logo meetelt.
+    """
     pixel_offset = struct.unpack_from("<I", data, 10)[0]
     width = struct.unpack_from("<i", data, 18)[0]
     height = struct.unpack_from("<i", data, 22)[0]
     bpp = struct.unpack_from("<H", data, 28)[0]
-    if bpp != 24:
-        raise ValueError(f"verwacht 24-bit BMP, kreeg {bpp}")
+    if bpp not in (24, 32):
+        raise ValueError(f"verwacht 24- of 32-bit BMP, kreeg {bpp}")
+    px = bpp // 8
     bottom_up = height > 0
     h = abs(height)
-    row_size = (width * 3 + 3) & ~3
+    row_size = (width * px + 3) & ~3
     out = []
     for row in range(h):
         src = (h - 1 - row) if bottom_up else row
         base = pixel_offset + src * row_size
         for x in range(width):
-            b = data[base + x * 3]
-            g = data[base + x * 3 + 1]
-            r = data[base + x * 3 + 2]
-            out.append((r, g, b))
+            off = base + x * px
+            if px == 4 and data[off + 3] < ALPHA_MIN:
+                continue  # transparant -> overslaan
+            out.append((data[off + 2], data[off + 1], data[off]))  # B,G,R -> R,G,B
     return out
 
 
@@ -71,5 +77,7 @@ def color_from_png(png_path):
     try:
         pixels = sips_pixels(png_path, DOMINANT_SIZE)
     except (subprocess.CalledProcessError, ValueError, OSError):
+        return None
+    if not pixels:  # volledig transparant icoon
         return None
     return dominant_color(pixels)

@@ -19,9 +19,29 @@ def _bmp(pixels, w, h):
     return header + info + pixel_data
 
 
+def _bmp32(pixels, w, h):
+    """Bouw een 32-bit BMP. pixels = lijst van (r,g,b,a), rij-voor-rij top-down."""
+    row_size = w * 4  # 32-bit rijen zijn altijd 4-byte aligned
+    pixel_data = b""
+    for row in range(h - 1, -1, -1):  # bottom-up
+        for x in range(w):
+            r, g, b, a = pixels[row * w + x]
+            pixel_data += bytes((b, g, r, a))
+    offset = 54
+    header = b"BM" + struct.pack("<IHHI", offset + len(pixel_data), 0, 0, offset)
+    info = struct.pack("<IiiHHIIiiII", 40, w, h, 1, 32, 0, len(pixel_data), 2835, 2835, 0, 0)
+    return header + info + pixel_data
+
+
 def test_read_bmp_roundtrip():
     pixels = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (10, 20, 30)]
     assert read_bmp(_bmp(pixels, 2, 2)) == pixels
+
+
+def test_read_bmp_32bit_skips_transparent():
+    # twee zichtbare, twee transparante pixels -> alleen de zichtbare terug
+    pixels = [(200, 50, 10, 255), (0, 0, 0, 0), (0, 0, 0, 0), (30, 60, 90, 255)]
+    assert read_bmp(_bmp32(pixels, 2, 2)) == [(200, 50, 10), (30, 60, 90)]
 
 
 def test_average_color():
