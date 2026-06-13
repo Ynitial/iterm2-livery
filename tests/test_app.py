@@ -201,3 +201,18 @@ def test_cli_rename_prints_title(tmp_path):
     )
     assert proc.returncode == 0
     assert "]0;dev\007" in proc.stdout
+
+
+def test_rename_does_not_rewrite_existing_profile(tmp_path, make_png, monkeypatch):
+    # Renamen in tab A mag het gedeelde profiel niet herschrijven (zou tab B resetten).
+    monkeypatch.setattr(app, "detect_theme", lambda: "dark")
+    monkeypatch.setattr(app, "color_from_png", lambda p: (40, 80, 200))
+    (tmp_path / "site.webmanifest").write_text('{"icons":[{"src":"a.png"}]}')
+    make_png(tmp_path / "a.png", (40, 80, 200))
+    d = _dirs(tmp_path)
+    sdir = tmp_path / "sessions"
+    app.cmd_emit(cwd=tmp_path, session_dir=sdir, session_id="t1", **d)  # schrijft profiel
+    calls = []
+    monkeypatch.setattr(app, "_ensure_profile", lambda *a, **k: calls.append(1))
+    app.cmd_rename("dev", cwd=tmp_path, session_dir=sdir, session_id="t1", **d)
+    assert calls == []  # bestaand profiel niet opnieuw geschreven

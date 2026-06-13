@@ -148,7 +148,10 @@ def cmd_rename(custom, cwd, profiles_dir, store_dir, session_dir=DEFAULT_SESSION
     entry = store.read_entry(store_dir, root) or _detect(root, force=True)
     entry["last_theme"] = theme
     store.write_entry(store_dir, root, entry)
-    _ensure_profile(profiles_dir, entry, theme)
+    # Profiel NIET herschrijven als 't al bestaat: een herschreven profiel laat
+    # iTerm2 't herladen, wat de sessienaam van ándere tabs in dezelfde map reset.
+    if not profile_file(profiles_dir, root).exists():
+        _ensure_profile(profiles_dir, entry, theme)
     return _emit(entry, theme, custom)
 
 
