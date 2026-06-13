@@ -6,7 +6,7 @@ from livery import escapes, store
 from livery.color import color_from_png
 from livery.manifest import find_manifest, first_png
 from livery.profile import (
-    build_profile, default_inherited_settings, profile_file, profile_name, write_profile,
+    build_profile, default_inherited_settings, profile_file, write_profile,
 )
 from livery.roots import find_project_root
 from livery.tint import detect_theme, mute
@@ -53,6 +53,11 @@ def _detect(root, force=False):
     }
 
 
+def _profile_label(entry):
+    """De profielnaam: een handmatige project-naam (`rename --project`) of de mapnaam."""
+    return entry.get("label") or root_name(entry["root"])
+
+
 def _ensure_profile(profiles_dir, entry, theme):
     """Schrijf het Dynamic Profile, maar alleen als de entry een icoon heeft."""
     if not entry.get("icon_path") or not entry.get("dominant_color"):
@@ -60,7 +65,8 @@ def _ensure_profile(profiles_dir, entry, theme):
     rgb = tuple(entry["dominant_color"])
     tab = mute(rgb, theme, _tab_strength())
     colors = default_inherited_settings()
-    write_profile(profiles_dir, build_profile(entry["root"], entry["icon_path"], tab, colors))
+    profile = build_profile(entry["root"], entry["icon_path"], tab, colors, name=_profile_label(entry))
+    write_profile(profiles_dir, profile)
     time.sleep(_profile_delay())  # geef iTerm2 tijd om het profiel in te laden
 
 
@@ -73,11 +79,13 @@ def _emit(entry, theme, custom=None):
     """
     if entry.get("icon_path") and entry.get("dominant_color"):
         rgb = tuple(entry["dominant_color"])
-        out = escapes.set_profile(profile_name(entry["root"]))
+        out = escapes.set_profile(_profile_label(entry))
         out += escapes.tab_color(mute(rgb, theme, _tab_strength()))
     else:
         out = escapes.default_look()
-    out += escapes.title(custom or entry["name"])
+    # Geen tab-rename? Dan sessienaam = profielnaam, zodat "Profile & Session Name"
+    # samenvalt tot één naam (anders bv. "Krabben — vanderkrabben").
+    out += escapes.title(custom or _profile_label(entry))
     return out
 
 
@@ -140,19 +148,28 @@ def cmd_set_icon(icon_path, cwd, profiles_dir, store_dir, session_dir=DEFAULT_SE
     return _emit(entry, theme, store.read_custom(session_dir, session_id))
 
 
-def cmd_rename(custom, cwd, profiles_dir, store_dir, session_dir=DEFAULT_SESSIONS, session_id=None):
+def cmd_rename(name, cwd, profiles_dir, store_dir, session_dir=DEFAULT_SESSIONS,
+               session_id=None, project=False):
+    """Hernoem deze tab (sessienaam) of — met project=True — het hele project (profielnaam)."""
     root = find_project_root(cwd)
     theme = detect_theme()
-    custom = custom or None
-    store.write_custom(session_dir, session_id, custom)  # per tab, gekoppeld aan session_id
+    name = name or None
     entry = store.read_entry(store_dir, root) or _detect(root, force=True)
     entry["last_theme"] = theme
+
+    if project:
+        entry["label"] = name          # geldt voor alle tabs in dit project
+        store.write_entry(store_dir, root, entry)
+        _ensure_profile(profiles_dir, entry, theme)  # profielnaam wijzigt -> herschrijven
+        return _emit(entry, theme, store.read_custom(session_dir, session_id))
+
+    store.write_custom(session_dir, session_id, name)  # alleen deze tab
     store.write_entry(store_dir, root, entry)
-    # Profiel NIET herschrijven als 't al bestaat: een herschreven profiel laat
-    # iTerm2 't herladen, wat de sessienaam van ándere tabs in dezelfde map reset.
+    # Profiel NIET herschrijven als 't al bestaat: dat zou iTerm 't laten herladen
+    # en de sessienaam van ándere tabs in dezelfde map resetten.
     if not profile_file(profiles_dir, root).exists():
         _ensure_profile(profiles_dir, entry, theme)
-    return _emit(entry, theme, custom)
+    return _emit(entry, theme, name)
 
 
 def cmd_clean(profiles_dir, store_dir):

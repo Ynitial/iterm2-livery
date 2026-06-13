@@ -65,7 +65,8 @@ def test_emit_uses_store_without_rescanning(tmp_path, make_png, monkeypatch):
 
     monkeypatch.setattr(app, "color_from_png", boom)
     out = app.cmd_emit(cwd=tmp_path, **d)
-    assert "]0;Cached\007" in out
+    # geen rescan; titel + profiel = mapnaam (profiel-label)
+    assert f"]0;{tmp_path.resolve().name}\007" in out
     assert f"SetProfile={tmp_path.resolve().name}\007" in out
 
 
@@ -216,3 +217,21 @@ def test_rename_does_not_rewrite_existing_profile(tmp_path, make_png, monkeypatc
     monkeypatch.setattr(app, "_ensure_profile", lambda *a, **k: calls.append(1))
     app.cmd_rename("dev", cwd=tmp_path, session_dir=sdir, session_id="t1", **d)
     assert calls == []  # bestaand profiel niet opnieuw geschreven
+
+
+def test_rename_project_sets_profile_label(tmp_path, make_png, monkeypatch):
+    monkeypatch.setattr(app, "detect_theme", lambda: "dark")
+    monkeypatch.setattr(app, "color_from_png", lambda p: (40, 80, 200))
+    (tmp_path / "site.webmanifest").write_text('{"icons":[{"src":"a.png"}]}')
+    make_png(tmp_path / "a.png", (40, 80, 200))
+    d = _dirs(tmp_path)
+    sdir = tmp_path / "sessions"
+    out = app.cmd_rename("Krabben", cwd=tmp_path, session_dir=sdir, session_id="t1",
+                         project=True, **d)
+    # profielnaam (project) = Krabben; geldt projectbreed (in de store)
+    assert "SetProfile=Krabben\007" in out
+    assert store.read_entry(d["store_dir"], tmp_path.resolve())["label"] == "Krabben"
+    # tab-rename blijft per sessie en los van het project-label
+    app.cmd_rename("dev", cwd=tmp_path, session_dir=sdir, session_id="t1", **d)
+    assert store.read_custom(sdir, "t1") == "dev"
+    assert store.read_entry(d["store_dir"], tmp_path.resolve())["label"] == "Krabben"

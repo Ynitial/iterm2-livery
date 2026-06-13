@@ -50,9 +50,9 @@ def _color(rgb):
     }
 
 
-def build_profile(root, icon_path, tab_rgb, color_settings=None):
+def build_profile(root, icon_path, tab_rgb, color_settings=None, name=None):
     profile = {
-        "Name": profile_name(root),
+        "Name": name or profile_name(root),
         "Guid": profile_guid(root),
         "Dynamic Profile Parent Name": "Default",
         "Icon": 2,

@@ -21,9 +21,9 @@ livery() {
   case "$1" in
     scan)     out="$(_livery_py scan --cwd "$PWD" --session "$ITERM_SESSION_ID")" ;;
     set-icon) out="$(_livery_py set-icon "$2" --cwd "$PWD" --session "$ITERM_SESSION_ID")" ;;
-    rename)   out="$(_livery_py rename "$2" --cwd "$PWD" --session "$ITERM_SESSION_ID")" ;;
+    rename)   out="$(_livery_py rename "${@:2}" --cwd "$PWD" --session "$ITERM_SESSION_ID")" ;;
     clean)    _livery_py clean; return 0 ;;
-    *) echo "usage: livery {scan|set-icon <pad>|rename [naam]|clean}"; return 1 ;;
+    *) echo "usage: livery {scan|set-icon <pad>|rename [naam] [-p|--project]|clean}"; return 1 ;;
   esac
   print -rn -- "$out"
 }

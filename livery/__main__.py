@@ -19,7 +19,9 @@ def main(argv=None):
     p_set = sub.add_parser("set-icon", parents=[common])
     p_set.add_argument("path")
     p_ren = sub.add_parser("rename", parents=[common])
-    p_ren.add_argument("custom", nargs="?", default="")
+    p_ren.add_argument("name", nargs="?", default="")
+    p_ren.add_argument("-p", "--project", action="store_true",
+                       help="hernoem het hele project (profielnaam) i.p.v. deze tab")
     sub.add_parser("clean", parents=[common])
 
     a = parser.parse_args(argv)
@@ -33,7 +35,7 @@ def main(argv=None):
     elif a.cmd == "set-icon":
         sys.stdout.write(app.cmd_set_icon(a.path, cwd=a.cwd, **dirs, **sess))
     elif a.cmd == "rename":
-        sys.stdout.write(app.cmd_rename(a.custom, cwd=a.cwd, **dirs, **sess))
+        sys.stdout.write(app.cmd_rename(a.name, cwd=a.cwd, project=a.project, **dirs, **sess))
     elif a.cmd == "clean":
         for root in app.cmd_clean(**dirs):
             sys.stderr.write(f"removed {root}\n")
