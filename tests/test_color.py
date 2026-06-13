@@ -60,6 +60,19 @@ def test_dominant_falls_back_to_average_when_all_extreme():
     assert dominant_color(pixels) == average_color(pixels)
 
 
+def test_dominant_prefers_saturated_brand_color_over_dull_mass():
+    # Veel doffe grijs-tinten + minder maar verzadigde rode pixels -> rood wint
+    # (zoals het van-der-Krabben-logo: grijze massa + rood accent).
+    pixels = [(70, 70, 72)] * 20 + [(220, 30, 30)] * 8
+    assert dominant_color(pixels) == (220, 30, 30)
+
+
+def test_dominant_grayscale_falls_back_to_frequency():
+    # Geen verzadiging -> meest voorkomende grijs.
+    pixels = [(70, 70, 70)] * 10 + [(120, 120, 120)] * 3
+    assert dominant_color(pixels) == (70, 70, 70)
+
+
 import shutil
 
 import pytest

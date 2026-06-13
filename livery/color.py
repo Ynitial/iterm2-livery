@@ -46,14 +46,33 @@ def _extreme(p):
     return all(c <= NEAR for c in p) or all(c >= 255 - NEAR for c in p)
 
 
+def _saturation(p):
+    mx = max(p)
+    return 0.0 if mx == 0 else (mx - min(p)) / mx
+
+
+def _bucket(p):
+    return tuple(c >> 4 for c in p)
+
+
 def dominant_color(pixels):
-    """Meest voorkomende gequantiseerde niet-extreme kleur; anders gemiddelde."""
+    """De merkkleur: verzadigingsgewogen meest voorkomende niet-extreme kleur.
+
+    Door op frequentie × verzadiging te wegen wint een levendige accentkleur
+    (bv. een rood logo-detail) van een grotere doffe/grijze massa. Heeft het
+    icoon geen verzadiging (echt grijs), dan valt het terug op pure frequentie;
+    is alles extreem (wit/zwart), dan op het gemiddelde.
+    """
     candidates = [p for p in pixels if not _extreme(p)]
     if not candidates:
         return average_color(pixels)
-    counts = Counter(tuple(c >> 4 for c in p) for p in candidates)
-    winner = counts.most_common(1)[0][0]
-    members = [p for p in candidates if tuple(c >> 4 for c in p) == winner]
+    weighted = Counter()
+    for p in candidates:
+        weighted[_bucket(p)] += _saturation(p)
+    bucket, weight = weighted.most_common(1)[0]
+    if weight == 0:  # egaal/grijs icoon -> terug naar frequentie
+        bucket = Counter(_bucket(p) for p in candidates).most_common(1)[0][0]
+    members = [p for p in candidates if _bucket(p) == bucket]
     return average_color(members)
 
 
