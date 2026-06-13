@@ -10,7 +10,7 @@ from livery.profile import (
 )
 from livery.roots import find_project_root
 from livery.tint import detect_theme, mute
-from livery.title import base_name, tab_title
+from livery.title import root_name, tab_title
 
 DEFAULT_STORE = Path.home() / ".config" / "livery" / "dirs"
 DEFAULT_PROFILES = Path.home() / "Library" / "Application Support" / "iTerm2" / "DynamicProfiles"
@@ -46,7 +46,7 @@ def _detect(root, force=False):
         "root": str(root),
         "icon_path": str(png) if png else None,
         "dominant_color": list(rgb) if rgb else None,
-        "name": base_name(root, manifest),
+        "name": root_name(root),
         "custom_name": None,
         "source": source,
         "last_theme": None,
@@ -77,8 +77,8 @@ def _emit(entry, theme):
 
 
 def _bare(root):
-    """Niet-project-map: toon de mapnaam als titel + default-look (geen store-entry)."""
-    return escapes.title(Path(root).name) + escapes.default_look()
+    """Niet-project-map: titel wissen (iTerm valt terug op z'n default) + default-look."""
+    return escapes.reset()
 
 
 def cmd_emit(cwd, profiles_dir, store_dir):
@@ -129,10 +129,9 @@ def cmd_set_icon(icon_path, cwd, profiles_dir, store_dir):
     if rgb is None:
         return escapes.reset()
     old = store.read_entry(store_dir, root)
-    name = old["name"] if old and old.get("name") else base_name(root, find_manifest(root, maxdepth=_maxdepth()))
     entry = {
         "root": str(root), "icon_path": str(icon), "dominant_color": list(rgb),
-        "name": name, "custom_name": old.get("custom_name") if old else None,
+        "name": root_name(root), "custom_name": old.get("custom_name") if old else None,
         "source": "manual", "last_theme": theme,
     }
     store.write_entry(store_dir, root, entry)

@@ -8,11 +8,11 @@ def _dirs(tmp_path):
     return {"profiles_dir": tmp_path / "profiles", "store_dir": tmp_path / "store"}
 
 
-def test_emit_not_a_project_shows_dirname(tmp_path, monkeypatch):
+def test_emit_not_a_project_resets(tmp_path, monkeypatch):
     monkeypatch.setattr(app, "detect_theme", lambda: "dark")
     out = app.cmd_emit(cwd=tmp_path, **_dirs(tmp_path))
-    # Niet-project: mapnaam als titel + default-look, geen store-entry.
-    assert out == escapes.title(tmp_path.resolve().name) + escapes.default_look()
+    # Niet-project: titel wissen (iTerm default) + default-look, geen store-entry.
+    assert out == escapes.reset()
     assert app.store.read_entry(_dirs(tmp_path)["store_dir"], tmp_path.resolve()) is None
 
 
@@ -25,11 +25,11 @@ def test_emit_manifest_sets_icon_color_and_title(tmp_path, make_png, monkeypatch
 
     out = app.cmd_emit(cwd=tmp_path, **d)
 
-    assert "]0;Slowboard\007" in out
+    assert f"]0;{tmp_path.resolve().name}\007" in out  # titel = mapnaam van de root
     assert "SetProfile=livery:" in out
     entry = store.read_entry(d["store_dir"], tmp_path.resolve())
     assert entry["dominant_color"] == [40, 80, 200]
-    assert entry["name"] == "Slowboard"
+    assert entry["name"] == tmp_path.resolve().name
     assert entry["source"] == "manifest"
     assert profile_file(d["profiles_dir"], tmp_path.resolve()).exists()
 
@@ -41,11 +41,11 @@ def test_emit_env_only_sets_title_no_icon(tmp_path, monkeypatch):
 
     out = app.cmd_emit(cwd=tmp_path, **d)
 
-    assert "]0;EnvApp\007" in out
+    assert f"]0;{tmp_path.resolve().name}\007" in out  # titel = mapnaam, niet .env-naam
     assert "SetProfile=Default" in out
     entry = store.read_entry(d["store_dir"], tmp_path.resolve())
     assert entry["icon_path"] is None
-    assert entry["name"] == "EnvApp"
+    assert entry["name"] == tmp_path.resolve().name
     assert entry["source"] == "env"
 
 
@@ -69,7 +69,7 @@ def test_emit_uses_store_without_rescanning(tmp_path, make_png, monkeypatch):
     assert "SetProfile=livery:" in out
 
 
-def test_emit_missing_icon_file_falls_back_to_dirname(tmp_path, monkeypatch):
+def test_emit_missing_icon_file_resets(tmp_path, monkeypatch):
     monkeypatch.setattr(app, "detect_theme", lambda: "dark")
     d = _dirs(tmp_path)
     store.write_entry(d["store_dir"], tmp_path.resolve(), {
@@ -78,7 +78,7 @@ def test_emit_missing_icon_file_falls_back_to_dirname(tmp_path, monkeypatch):
         "source": "manifest", "last_theme": "dark",
     })
     out = app.cmd_emit(cwd=tmp_path, **d)
-    assert out == escapes.title(tmp_path.resolve().name) + escapes.default_look()
+    assert out == escapes.reset()
 
 
 def test_scan_overwrites_entry_keeps_custom(tmp_path, make_png, monkeypatch):
@@ -96,7 +96,7 @@ def test_scan_overwrites_entry_keeps_custom(tmp_path, make_png, monkeypatch):
     entry = store.read_entry(d["store_dir"], tmp_path.resolve())
     assert entry["dominant_color"] == [10, 10, 200]
     assert entry["icon_path"].endswith("a.png")
-    assert entry["name"] == "Slow"
+    assert entry["name"] == tmp_path.resolve().name
     assert entry["custom_name"] == "dev"
 
 
@@ -119,7 +119,7 @@ def test_rename_sets_and_clears_custom(tmp_path, monkeypatch):
     d = _dirs(tmp_path)
     (tmp_path / ".env").write_text("APP_NAME=EnvApp\n")
     out = app.cmd_rename("dev", cwd=tmp_path, **d)
-    assert "]0;EnvApp | dev\007" in out
+    assert f"]0;{tmp_path.resolve().name} | dev\007" in out  # mapnaam | custom
     assert store.read_entry(d["store_dir"], tmp_path.resolve())["custom_name"] == "dev"
     app.cmd_rename("", cwd=tmp_path, **d)
     assert store.read_entry(d["store_dir"], tmp_path.resolve())["custom_name"] is None
@@ -178,4 +178,4 @@ def test_cli_rename_prints_title(tmp_path):
         cwd=repo, env=dict(os.environ), capture_output=True, text=True,
     )
     assert proc.returncode == 0
-    assert "]0;EnvApp | dev\007" in proc.stdout
+    assert f"]0;{tmp_path.resolve().name} | dev\007" in proc.stdout

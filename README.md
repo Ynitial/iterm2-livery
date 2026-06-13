@@ -42,17 +42,17 @@ Een root wordt "themed" als er een `site.webmanifest` **of** een `.env` is:
 
 - **Manifest met PNG** → icoon + gemute tint + titel.
 - **Alleen `.env`** → titel (geen custom icoon/kleur).
-- **Geen van beide** → geen icoon/kleur; de tab toont de **mapnaam** als titel.
+- **Geen van beide** → niets; de tab houdt iTerm's eigen default-titel.
 
-> **Tip:** livery beheert nu de tabtitel. Gebruik je oh-my-zsh, zet dan
+> **Tip:** livery zet de tabtitel. Gebruik je oh-my-zsh, zet dan
 > `DISABLE_AUTO_TITLE="true"` in je `.zshrc` (vóór `source oh-my-zsh.sh`),
 > anders overschrijft oh-my-zsh livery's titel bij elke prompt.
 
 ### Naam (tab-titel)
 
-Volgorde: manifest `name` → manifest `short_name` → `.env`
-(`APP_NAME`, `PROJECT_NAME`, `NAME`, `VITE_APP_NAME`, `NEXT_PUBLIC_APP_NAME`,
-eerste niet-leeg) → de mapnaam van de root.
+De titel is de **mapnaam van de project-root** (bv. `vanderkrabben`), plus
+` | <custom>` als je `livery rename <custom>` hebt gedaan. In een niet-getheme­de
+map zet livery geen titel — iTerm toont z'n eigen default.
 
 ### Kleur
 
