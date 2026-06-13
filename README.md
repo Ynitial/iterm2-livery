@@ -56,8 +56,10 @@ eerste niet-leeg) → de mapnaam van de root.
 
 ### Kleur
 
-De dominante kleur van het icoon (bijna-wit/zwart pixels eruit gefilterd),
-daarna subtiel ingeblend richting je systeem-thema (dark → zwart, light → wit).
+De dominante kleur van het icoon (bijna-wit/zwart pixels eruit gefilterd) kleurt
+de **tab** — standaard de volle merkkleur. De terminal-achtergrond wordt niet
+getint (blijft je thema). Wil je de tabkleur zachter, zet `LIVERY_TAB_STRENGTH`
+lager (blendt dan richting je thema-achtergrond).
 
 ## Commando's
 
@@ -72,9 +74,8 @@ daarna subtiel ingeblend richting je systeem-thema (dark → zwart, light → wi
 
 | Var | Default | Effect |
 |-----|---------|--------|
-| `LIVERY_TAB_STRENGTH` | `0.15` | Blend-sterkte tab-kleur (0 = thema-kleur, 1 = pure merkkleur) |
-| `LIVERY_BG_STRENGTH` | `0.07` | Blend-sterkte terminal-achtergrond |
-| `LIVERY_MAXDEPTH` | `6` | Max zoekdiepte vanaf de project-root |
+| `LIVERY_TAB_STRENGTH` | `1.0` | Tabkleur-sterkte (1 = volle merkkleur, 0 = thema-kleur) |
+| `LIVERY_MAXDEPTH` | `6` | Max zoekdiepte bij de recursieve `find` binnen een git-repo |
 | `LIVERY_LOG` | (uit) | `1` = foutregels naar `~/.config/livery/log` |
 
 ## Opslag

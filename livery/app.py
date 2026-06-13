@@ -14,11 +14,8 @@ DEFAULT_PROFILES = Path.home() / "Library" / "Application Support" / "iTerm2" / 
 
 
 def _tab_strength():
-    return float(os.environ.get("LIVERY_TAB_STRENGTH", "0.15"))
-
-
-def _bg_strength():
-    return float(os.environ.get("LIVERY_BG_STRENGTH", "0.07"))
+    # 1.0 = volle merkkleur op de tab; lager blendt richting het thema.
+    return float(os.environ.get("LIVERY_TAB_STRENGTH", "1.0"))
 
 
 def _maxdepth():
@@ -53,8 +50,7 @@ def _ensure_profile(profiles_dir, entry, theme):
         return
     rgb = tuple(entry["dominant_color"])
     tab = mute(rgb, theme, _tab_strength())
-    bg = mute(rgb, theme, _bg_strength())
-    write_profile(profiles_dir, build_profile(entry["root"], entry["icon_path"], tab, bg))
+    write_profile(profiles_dir, build_profile(entry["root"], entry["icon_path"], tab))
 
 
 def _emit(entry, theme):

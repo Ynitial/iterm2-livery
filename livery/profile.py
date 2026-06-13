@@ -23,7 +23,7 @@ def _color(rgb):
     }
 
 
-def build_profile(root, icon_path, tab_rgb, bg_rgb):
+def build_profile(root, icon_path, tab_rgb):
     return {
         "Name": profile_name(root),
         "Guid": profile_guid(root),
@@ -32,7 +32,6 @@ def build_profile(root, icon_path, tab_rgb, bg_rgb):
         "Custom Icon Path": str(icon_path),
         "Use Tab Color": True,
         "Tab Color": _color(tab_rgb),
-        "Background Color": _color(bg_rgb),
     }
 
 
