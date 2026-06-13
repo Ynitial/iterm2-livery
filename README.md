@@ -10,7 +10,7 @@ Net als een livery — de kleuren en het embleem waaraan je ziet bij wie iets ho
 1. iTerm2: `brew install --cask iterm2`
 2. Zet in je `~/.zshrc`:
    ```sh
-   source ~/projects/livery/livery.zsh
+   source ~/projects/iterm2-livery/livery.zsh
    ```
 3. Zet in iTerm2 de tab-titel goed: **Settings → Profiles → General → Title → Profile & Session Name**.
 4. Gebruik je **oh-my-zsh**? Zet dan ook `DISABLE_AUTO_TITLE="true"` in je `.zshrc` (vóór `source oh-my-zsh.sh`), anders overschrijft oh-my-zsh de tabtitel.
