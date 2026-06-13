@@ -11,7 +11,7 @@ _livery_run() {
   local logfile="/dev/null"
   [[ -n "$LIVERY_LOG" ]] && logfile="$HOME/.config/livery/log"
   local out
-  out="$(_livery_py emit --cwd "$PWD" 2>>"$logfile")" || return 0
+  out="$(_livery_py emit --cwd "$PWD" --session "$ITERM_SESSION_ID" 2>>"$logfile")" || return 0
   print -rn -- "$out"
 }
 
@@ -19,9 +19,9 @@ livery() {
   [[ "$TERM_PROGRAM" == "iTerm.app" ]] || { echo "livery: alleen in iTerm2"; return 1; }
   local out
   case "$1" in
-    scan)   out="$(_livery_py scan --cwd "$PWD")" ;;
-    set-icon) out="$(_livery_py set-icon "$2" --cwd "$PWD")" ;;
-    rename)   out="$(_livery_py rename "$2" --cwd "$PWD")" ;;
+    scan)     out="$(_livery_py scan --cwd "$PWD" --session "$ITERM_SESSION_ID")" ;;
+    set-icon) out="$(_livery_py set-icon "$2" --cwd "$PWD" --session "$ITERM_SESSION_ID")" ;;
+    rename)   out="$(_livery_py rename "$2" --cwd "$PWD" --session "$ITERM_SESSION_ID")" ;;
     clean)    _livery_py clean; return 0 ;;
     *) echo "usage: livery {scan|set-icon <pad>|rename [naam]|clean}"; return 1 ;;
   esac

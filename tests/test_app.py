@@ -25,8 +25,8 @@ def test_emit_manifest_sets_icon_color_and_title(tmp_path, make_png, monkeypatch
 
     out = app.cmd_emit(cwd=tmp_path, **d)
 
-    assert f"]0;{tmp_path.resolve().name}\007" in out  # titel = mapnaam van de root
-    assert "SetProfile=livery:" in out
+    assert f"]0;{tmp_path.resolve().name}\007" in out  # sessienaam = mapnaam (geen rename)
+    assert f"SetProfile={tmp_path.resolve().name}\007" in out  # profielnaam = mapnaam
     entry = store.read_entry(d["store_dir"], tmp_path.resolve())
     assert entry["dominant_color"] == [40, 80, 200]
     assert entry["name"] == tmp_path.resolve().name
@@ -66,7 +66,7 @@ def test_emit_uses_store_without_rescanning(tmp_path, make_png, monkeypatch):
     monkeypatch.setattr(app, "color_from_png", boom)
     out = app.cmd_emit(cwd=tmp_path, **d)
     assert "]0;Cached\007" in out
-    assert "SetProfile=livery:" in out
+    assert f"SetProfile={tmp_path.resolve().name}\007" in out
 
 
 def test_emit_missing_icon_file_resets(tmp_path, monkeypatch):
@@ -81,14 +81,14 @@ def test_emit_missing_icon_file_resets(tmp_path, monkeypatch):
     assert out == escapes.reset()
 
 
-def test_scan_overwrites_entry_keeps_custom(tmp_path, make_png, monkeypatch):
+def test_scan_overwrites_entry(tmp_path, make_png, monkeypatch):
     monkeypatch.setattr(app, "detect_theme", lambda: "dark")
     d = _dirs(tmp_path)
     (tmp_path / "site.webmanifest").write_text('{"name":"Slow","icons":[{"src":"a.png"}]}')
     make_png(tmp_path / "a.png", (10, 10, 200))
     store.write_entry(d["store_dir"], tmp_path.resolve(), {
         "root": str(tmp_path.resolve()), "icon_path": "/old.png",
-        "dominant_color": [1, 1, 1], "name": "Old", "custom_name": "dev",
+        "dominant_color": [1, 1, 1], "name": "Old",
         "source": "manifest", "last_theme": "dark",
     })
     monkeypatch.setattr(app, "color_from_png", lambda p: (10, 10, 200))
@@ -97,7 +97,6 @@ def test_scan_overwrites_entry_keeps_custom(tmp_path, make_png, monkeypatch):
     assert entry["dominant_color"] == [10, 10, 200]
     assert entry["icon_path"].endswith("a.png")
     assert entry["name"] == tmp_path.resolve().name
-    assert entry["custom_name"] == "dev"
 
 
 def test_set_icon_sets_manual_source_and_dirname(tmp_path, make_png, monkeypatch):
@@ -114,22 +113,44 @@ def test_set_icon_sets_manual_source_and_dirname(tmp_path, make_png, monkeypatch
     assert entry["name"] == tmp_path.name
 
 
-def test_rename_sets_and_clears_custom(tmp_path, monkeypatch):
+def test_rename_sets_session_name_per_tab(tmp_path, monkeypatch):
     monkeypatch.setattr(app, "detect_theme", lambda: "dark")
     d = _dirs(tmp_path)
+    sdir = tmp_path / "sessions"
     (tmp_path / ".env").write_text("APP_NAME=EnvApp\n")
-    out = app.cmd_rename("dev", cwd=tmp_path, **d)
-    assert f"]0;{tmp_path.resolve().name} | dev\007" in out  # mapnaam | custom
-    assert store.read_entry(d["store_dir"], tmp_path.resolve())["custom_name"] == "dev"
-    app.cmd_rename("", cwd=tmp_path, **d)
-    assert store.read_entry(d["store_dir"], tmp_path.resolve())["custom_name"] is None
+    # rename zet de sessienaam = de custom (per tab), niet 'mapnaam | custom'
+    out = app.cmd_rename("dev", cwd=tmp_path, session_dir=sdir, session_id="w0t1", **d)
+    assert "]0;dev\007" in out
+    assert store.read_custom(sdir, "w0t1") == "dev"
+    # leeg argument wist 'm
+    app.cmd_rename("", cwd=tmp_path, session_dir=sdir, session_id="w0t1", **d)
+    assert store.read_custom(sdir, "w0t1") is None
 
 
-def test_rename_on_bare_dir_uses_dirname(tmp_path, monkeypatch):
+def test_rename_is_per_session(tmp_path, monkeypatch):
     monkeypatch.setattr(app, "detect_theme", lambda: "dark")
     d = _dirs(tmp_path)
-    out = app.cmd_rename("x", cwd=tmp_path, **d)
-    assert f"]0;{tmp_path.name} | x\007" in out
+    sdir = tmp_path / "sessions"
+    app.cmd_rename("A", cwd=tmp_path, session_dir=sdir, session_id="tabA", **d)
+    app.cmd_rename("B", cwd=tmp_path, session_dir=sdir, session_id="tabB", **d)
+    # twee tabs in dezelfde map -> elk een eigen naam
+    assert store.read_custom(sdir, "tabA") == "A"
+    assert store.read_custom(sdir, "tabB") == "B"
+
+
+def test_emit_uses_session_custom(tmp_path, make_png, monkeypatch):
+    monkeypatch.setattr(app, "detect_theme", lambda: "dark")
+    monkeypatch.setattr(app, "color_from_png", lambda p: (40, 80, 200))
+    (tmp_path / "site.webmanifest").write_text('{"icons":[{"src":"a.png"}]}')
+    make_png(tmp_path / "a.png", (40, 80, 200))
+    d = _dirs(tmp_path)
+    sdir = tmp_path / "sessions"
+    store.write_custom(sdir, "tabA", "feature")
+    out = app.cmd_emit(cwd=tmp_path, session_dir=sdir, session_id="tabA", **d)
+    assert "]0;feature\007" in out  # sessienaam uit de per-tab store
+    # andere tab (geen custom) -> mapnaam
+    out2 = app.cmd_emit(cwd=tmp_path, session_dir=sdir, session_id="tabB", **d)
+    assert f"]0;{tmp_path.resolve().name}\007" in out2
 
 
 def test_clean_removes_orphan_entries(tmp_path):
@@ -174,8 +195,9 @@ def test_cli_rename_prints_title(tmp_path):
         [sys.executable, "-m", "livery", "rename", "dev",
          "--cwd", str(tmp_path),
          "--profiles-dir", str(tmp_path / "p"),
-         "--store-dir", str(tmp_path / "s")],
+         "--store-dir", str(tmp_path / "s"),
+         "--session-dir", str(tmp_path / "sess"), "--session", "w0t1"],
         cwd=repo, env=dict(os.environ), capture_output=True, text=True,
     )
     assert proc.returncode == 0
-    assert f"]0;{tmp_path.resolve().name} | dev\007" in proc.stdout
+    assert "]0;dev\007" in proc.stdout

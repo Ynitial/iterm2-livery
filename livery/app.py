@@ -10,9 +10,10 @@ from livery.profile import (
 )
 from livery.roots import find_project_root
 from livery.tint import detect_theme, mute
-from livery.title import root_name, tab_title
+from livery.title import root_name
 
 DEFAULT_STORE = Path.home() / ".config" / "livery" / "dirs"
+DEFAULT_SESSIONS = Path.home() / ".config" / "livery" / "sessions"
 DEFAULT_PROFILES = Path.home() / "Library" / "Application Support" / "iTerm2" / "DynamicProfiles"
 
 
@@ -46,8 +47,7 @@ def _detect(root, force=False):
         "root": str(root),
         "icon_path": str(png) if png else None,
         "dominant_color": list(rgb) if rgb else None,
-        "name": root_name(root),
-        "custom_name": None,
+        "name": root_name(root),  # mapnaam; ook de profielnaam
         "source": source,
         "last_theme": None,
     }
@@ -64,11 +64,12 @@ def _ensure_profile(profiles_dir, entry, theme):
     time.sleep(_profile_delay())  # geef iTerm2 tijd om het profiel in te laden
 
 
-def _emit(entry, theme):
-    """Escape-output: eerst de profiel-switch/kleur, dán de titel.
+def _emit(entry, theme, custom=None):
+    """Escape-output: eerst de profiel-switch/kleur, dán de sessienaam (titel).
 
-    De titel komt als laatste, want SetProfile reset de sessienaam — anders zou
-    onze titel wel in de titelbalk maar niet in de tab verschijnen.
+    De profielnaam (= mapnaam) toont iTerm via de "Profile Name"-component; de
+    sessienaam die wij hier zetten is de per-tab `rename` (Session Name-component).
+    Titel als laatste, want SetProfile reset de sessienaam.
     """
     if entry.get("icon_path") and entry.get("dominant_color"):
         rgb = tuple(entry["dominant_color"])
@@ -76,7 +77,7 @@ def _emit(entry, theme):
         out += escapes.tab_color(mute(rgb, theme, _tab_strength()))
     else:
         out = escapes.default_look()
-    out += escapes.title(tab_title(entry["name"], entry.get("custom_name")))
+    out += escapes.title(custom or entry["name"])
     return out
 
 
@@ -85,9 +86,10 @@ def _bare(root):
     return escapes.reset()
 
 
-def cmd_emit(cwd, profiles_dir, store_dir):
+def cmd_emit(cwd, profiles_dir, store_dir, session_dir=DEFAULT_SESSIONS, session_id=None):
     root = find_project_root(cwd)
     theme = detect_theme()
+    custom = store.read_custom(session_dir, session_id)
     entry = store.read_entry(store_dir, root)
 
     if entry is None:
@@ -97,7 +99,7 @@ def cmd_emit(cwd, profiles_dir, store_dir):
         entry["last_theme"] = theme
         store.write_entry(store_dir, root, entry)
         _ensure_profile(profiles_dir, entry, theme)
-        return _emit(entry, theme)
+        return _emit(entry, theme, custom)
 
     if entry.get("icon_path") and not Path(entry["icon_path"]).exists():
         return _bare(root)
@@ -107,51 +109,47 @@ def cmd_emit(cwd, profiles_dir, store_dir):
         _ensure_profile(profiles_dir, entry, theme)
         entry["last_theme"] = theme
         store.write_entry(store_dir, root, entry)
-    return _emit(entry, theme)
+    return _emit(entry, theme, custom)
 
 
-def cmd_scan(cwd, profiles_dir, store_dir):
+def cmd_scan(cwd, profiles_dir, store_dir, session_dir=DEFAULT_SESSIONS, session_id=None):
     root = find_project_root(cwd)
     theme = detect_theme()
-    old = store.read_entry(store_dir, root)
     entry = _detect(root)
     if entry is None:
         return _bare(root)
-    if old and old.get("custom_name"):
-        entry["custom_name"] = old["custom_name"]
     entry["last_theme"] = theme
     store.write_entry(store_dir, root, entry)
     _ensure_profile(profiles_dir, entry, theme)
-    return _emit(entry, theme)
+    return _emit(entry, theme, store.read_custom(session_dir, session_id))
 
 
-def cmd_set_icon(icon_path, cwd, profiles_dir, store_dir):
+def cmd_set_icon(icon_path, cwd, profiles_dir, store_dir, session_dir=DEFAULT_SESSIONS, session_id=None):
     root = find_project_root(cwd)
     theme = detect_theme()
     icon = Path(icon_path).expanduser().resolve()
     rgb = color_from_png(icon)
     if rgb is None:
         return escapes.reset()
-    old = store.read_entry(store_dir, root)
     entry = {
         "root": str(root), "icon_path": str(icon), "dominant_color": list(rgb),
-        "name": root_name(root), "custom_name": old.get("custom_name") if old else None,
-        "source": "manual", "last_theme": theme,
+        "name": root_name(root), "source": "manual", "last_theme": theme,
     }
     store.write_entry(store_dir, root, entry)
     _ensure_profile(profiles_dir, entry, theme)
-    return _emit(entry, theme)
+    return _emit(entry, theme, store.read_custom(session_dir, session_id))
 
 
-def cmd_rename(custom, cwd, profiles_dir, store_dir):
+def cmd_rename(custom, cwd, profiles_dir, store_dir, session_dir=DEFAULT_SESSIONS, session_id=None):
     root = find_project_root(cwd)
     theme = detect_theme()
+    custom = custom or None
+    store.write_custom(session_dir, session_id, custom)  # per tab, gekoppeld aan session_id
     entry = store.read_entry(store_dir, root) or _detect(root, force=True)
-    entry["custom_name"] = custom or None
     entry["last_theme"] = theme
     store.write_entry(store_dir, root, entry)
     _ensure_profile(profiles_dir, entry, theme)
-    return _emit(entry, theme)
+    return _emit(entry, theme, custom)
 
 
 def cmd_clean(profiles_dir, store_dir):

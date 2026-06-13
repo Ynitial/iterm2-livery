@@ -11,11 +11,8 @@ INHERITED_KEYS = (
     "Use Separate Colors for Light and Dark Mode",
     "Background Color", "Background Color (Light)", "Background Color (Dark)",
     "Foreground Color", "Foreground Color (Light)", "Foreground Color (Dark)",
+    "Title Components", "Sync Title",  # volg jouw tab-titel-instelling (bv. Profile & Session Name)
 )
-
-# iTerm2 Title Components-bitmask: 1 = Session Name. Zo toont de tab precies de
-# naam die livery via OSC zet (de mapnaam, evt. met | custom), zonder profielnaam.
-TITLE_SESSION_NAME = 1
 
 
 def default_inherited_settings(prefs_path=ITERM_PREFS):
@@ -37,7 +34,8 @@ def profile_guid(root):
 
 
 def profile_name(root):
-    return f"livery: {Path(root).name}"
+    # De mapnaam zelf; getoond via iTerm's "Profile Name"-titelcomponent.
+    return Path(root).name
 
 
 def profile_file(profiles_dir, root):
@@ -61,7 +59,6 @@ def build_profile(root, icon_path, tab_rgb, color_settings=None):
         "Custom Icon Path": str(icon_path),
         "Use Tab Color": True,
         "Tab Color": _color(tab_rgb),
-        "Title Components": TITLE_SESSION_NAME,  # tab toont onze sessienaam
     }
     if color_settings:
         profile.update(color_settings)  # neem licht/donker bg+fg van Default over

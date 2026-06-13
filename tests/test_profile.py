@@ -8,7 +8,7 @@ from livery.profile import (
 
 
 def test_profile_name_uses_root_basename():
-    assert profile_name("/Users/yoni/projects/slowboard") == "livery: slowboard"
+    assert profile_name("/Users/yoni/projects/slowboard") == "slowboard"
 
 
 def test_guid_stable_per_root():
@@ -23,9 +23,10 @@ def test_build_profile_has_icon_and_tab_color():
     assert p["Use Tab Color"] is True
     assert p["Dynamic Profile Parent Name"] == "Default"
     assert abs(p["Tab Color"]["Red Component"] - 1.0) < 1e-6
-    assert p["Title Components"] == 1  # Session Name -> tab toont onze titel
     # geen achtergrond-tint meer -> erft de standaard-achtergrond
     assert "Background Color" not in p
+    # Title Components zetten we niet; dat erven we van het Default-profiel
+    assert "Title Components" not in p
 
 
 def test_build_profile_merges_color_settings():

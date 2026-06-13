@@ -9,6 +9,8 @@ def main(argv=None):
     common.add_argument("--cwd", default=".")
     common.add_argument("--profiles-dir", default=str(app.DEFAULT_PROFILES))
     common.add_argument("--store-dir", default=str(app.DEFAULT_STORE))
+    common.add_argument("--session-dir", default=str(app.DEFAULT_SESSIONS))
+    common.add_argument("--session", default="")  # $ITERM_SESSION_ID (per tab)
 
     parser = argparse.ArgumentParser(prog="livery", parents=[common])
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -22,15 +24,16 @@ def main(argv=None):
 
     a = parser.parse_args(argv)
     dirs = {"profiles_dir": a.profiles_dir, "store_dir": a.store_dir}
+    sess = {"session_dir": a.session_dir, "session_id": a.session or None}
 
     if a.cmd == "emit":
-        sys.stdout.write(app.cmd_emit(cwd=a.cwd, **dirs))
+        sys.stdout.write(app.cmd_emit(cwd=a.cwd, **dirs, **sess))
     elif a.cmd == "scan":
-        sys.stdout.write(app.cmd_scan(cwd=a.cwd, **dirs))
+        sys.stdout.write(app.cmd_scan(cwd=a.cwd, **dirs, **sess))
     elif a.cmd == "set-icon":
-        sys.stdout.write(app.cmd_set_icon(a.path, cwd=a.cwd, **dirs))
+        sys.stdout.write(app.cmd_set_icon(a.path, cwd=a.cwd, **dirs, **sess))
     elif a.cmd == "rename":
-        sys.stdout.write(app.cmd_rename(a.custom, cwd=a.cwd, **dirs))
+        sys.stdout.write(app.cmd_rename(a.custom, cwd=a.cwd, **dirs, **sess))
     elif a.cmd == "clean":
         for root in app.cmd_clean(**dirs):
             sys.stderr.write(f"removed {root}\n")

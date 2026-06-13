@@ -50,9 +50,17 @@ Een root wordt "themed" als er een `site.webmanifest` **of** een `.env` is:
 
 ### Naam (tab-titel)
 
-De titel is de **mapnaam van de project-root** (bv. `vanderkrabben`), plus
-` | <custom>` als je `livery rename <custom>` hebt gedaan. In een niet-getheme­de
-map zet livery geen titel — iTerm toont z'n eigen default.
+livery gebruikt twee iTerm2-titelcomponenten:
+
+- **Profile Name = mapnaam van de project-root** (bv. `vanderkrabben`). Livery's
+  profiel heet naar de map, dus dit toont automatisch het project.
+- **Session Name = `livery rename <naam>`** — **per tab** (gekoppeld aan
+  `$ITERM_SESSION_ID`). Twee tabs in dezelfde map kunnen dus elk een eigen naam
+  hebben.
+
+Zet in iTerm2 de **Title** op **Profile & Session Name** (Settings → Profiles →
+General → Title). De tab toont dan `vanderkrabben` (geen rename) of
+`vanderkrabben — dev` (na `livery rename dev`). Niet-getheme­de map → geen titel.
 
 ### Kleur
 
@@ -65,9 +73,9 @@ lager (blendt dan richting je thema-achtergrond).
 
 | Commando | Effect |
 |----------|--------|
-| `livery scan` | Opnieuw afleiden uit `site.webmanifest` (behoudt je `rename`-suffix) |
+| `livery scan` | Opnieuw afleiden uit `site.webmanifest` (na een logo/naam-wijziging) |
 | `livery set-icon <pad>` | Handmatig icoon-pad instellen (werkt ook zonder manifest) |
-| `livery rename <naam>` | Titel wordt `<Naam> \| <naam>`; zonder argument wist het de suffix |
+| `livery rename <naam>` | Zet de **sessienaam** van deze tab (per tab); zonder argument wist het 'm |
 | `livery clean` | Verweesde profielen/store-entries opruimen |
 
 ## Configuratie (env-vars)

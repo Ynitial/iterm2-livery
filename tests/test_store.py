@@ -1,4 +1,6 @@
-from livery.store import iter_entries, read_entry, store_path, write_entry
+from livery.store import (
+    iter_entries, read_custom, read_entry, store_path, write_custom, write_entry,
+)
 
 
 def test_write_then_read(tmp_path):
@@ -22,3 +24,18 @@ def test_iter_entries(tmp_path):
     write_entry(tmp_path, "/b", {"root": "/b"})
     roots = sorted(e["root"] for e in iter_entries(tmp_path))
     assert roots == ["/a", "/b"]
+
+
+def test_session_custom_write_read_clear(tmp_path):
+    write_custom(tmp_path, "w0t1p0:ABC", "feature-x")
+    assert read_custom(tmp_path, "w0t1p0:ABC") == "feature-x"
+    # andere sessie ongemoeid
+    assert read_custom(tmp_path, "w0t2p0:XYZ") is None
+    # leeg/None wist 'm
+    write_custom(tmp_path, "w0t1p0:ABC", None)
+    assert read_custom(tmp_path, "w0t1p0:ABC") is None
+
+
+def test_session_custom_no_session_id(tmp_path):
+    assert read_custom(tmp_path, None) is None
+    write_custom(tmp_path, None, "x")  # mag niet crashen

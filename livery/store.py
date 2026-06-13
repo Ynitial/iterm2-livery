@@ -41,3 +41,34 @@ def delete_entry(store_dir, root):
     p = store_path(store_dir, root)
     if p.exists():
         p.unlink()
+
+
+# --- per-sessie custom naam (per tab, gekoppeld aan $ITERM_SESSION_ID) ---
+
+def session_path(session_dir, session_id):
+    return Path(session_dir) / f"{_hash(session_id)}.json"
+
+
+def read_custom(session_dir, session_id):
+    """De handmatige naam voor deze tab/sessie, of None."""
+    if not session_id:
+        return None
+    p = session_path(session_dir, session_id)
+    if not p.exists():
+        return None
+    try:
+        return json.loads(p.read_text()).get("custom") or None
+    except ValueError:
+        return None
+
+
+def write_custom(session_dir, session_id, custom):
+    """Zet/wis de handmatige naam voor deze tab/sessie."""
+    if not session_id:
+        return
+    p = session_path(session_dir, session_id)
+    if custom:
+        Path(session_dir).mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps({"session_id": session_id, "custom": custom}, indent=2))
+    elif p.exists():
+        p.unlink()
