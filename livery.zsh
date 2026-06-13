@@ -28,6 +28,8 @@ livery() {
   print -rn -- "$out"
 }
 
-autoload -U add-zsh-hook
+# `builtin` omzeilt een eventuele user-alias die `autoload` overschaduwt
+# (bv. `alias autoload="composer dump"`) — anders faalt het laden van add-zsh-hook.
+builtin autoload -Uz add-zsh-hook
 add-zsh-hook chpwd _livery_run
 _livery_run   # bij startup
