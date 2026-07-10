@@ -3,6 +3,8 @@ import json
 import plistlib
 from pathlib import Path
 
+from livery import palette
+
 ITERM_PREFS = Path.home() / "Library" / "Preferences" / "com.googlecode.iterm2.plist"
 
 # bg/fg-instellingen die we van het Default-profiel overnemen, zodat livery-tabs
@@ -70,3 +72,37 @@ def write_profile(profiles_dir, profile):
     d.mkdir(parents=True, exist_ok=True)
     path = d / f"{profile['Guid']}.json"
     path.write_text(json.dumps({"Profiles": [profile]}, indent=2))
+
+
+def command_profile_guid(name):
+    return "livery-cmd-" + hashlib.sha1(name.encode()).hexdigest()[:16]
+
+
+def command_profile_name(name):
+    return f"livery:{name}"
+
+
+def command_profile_file(profiles_dir, name):
+    return Path(profiles_dir) / f"{command_profile_guid(name)}.json"
+
+
+def _color_hex(hexcol):
+    h = hexcol.lstrip("#")
+    return _color(tuple(int(h[i:i + 2], 16) for i in (0, 2, 4)))
+
+
+def build_command_profile(name, bg_hex):
+    """Profiel voor de commando-look: één afgedwongen achtergrond + donker palet.
+
+    Bewust GEEN 'Use Separate Colors ...': we willen oranje in dark én light."""
+    profile = {
+        "Name": command_profile_name(name),
+        "Guid": command_profile_guid(name),
+        "Dynamic Profile Parent Name": "Default",
+        "Use Separate Colors for Light and Dark Mode": False,
+        "Background Color": _color_hex(bg_hex),
+        "Foreground Color": _color_hex(palette.FOREGROUND),
+    }
+    for i, hexcol in enumerate(palette.ANSI):
+        profile[f"Ansi {i} Color"] = _color_hex(hexcol)
+    return profile

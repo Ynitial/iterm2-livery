@@ -71,3 +71,25 @@ def test_write_profile_wraps_in_profiles_array(tmp_path):
     write_profile(tmp_path, p)
     written = json.loads(profile_file(tmp_path, "/x/proj").read_text())
     assert written["Profiles"][0]["Guid"] == p["Guid"]
+
+
+from livery import palette
+from livery.profile import (
+    build_command_profile, command_profile_name, command_profile_guid,
+)
+
+
+def test_build_command_profile_forces_orange_regardless_of_theme():
+    p = build_command_profile("claude", palette.BG)
+    assert p["Name"] == command_profile_name("claude") == "livery:claude"
+    assert p["Guid"] == command_profile_guid("claude")
+    # Dwing één achtergrond af, ongeacht dark/light.
+    assert p["Use Separate Colors for Light and Dark Mode"] is False
+    bg = p["Background Color"]
+    assert round(bg["Red Component"] * 255) == 217
+    assert round(bg["Green Component"] * 255) == 119
+    assert round(bg["Blue Component"] * 255) == 87
+    # Volledig 16-kleuren ANSI-palet aanwezig.
+    for i in range(16):
+        assert f"Ansi {i} Color" in p
+    assert p["Dynamic Profile Parent Name"] == "Default"
