@@ -32,3 +32,19 @@ def test_activate_creates_settings_when_missing(tmp_path):
     settings = tmp_path / "sub" / "settings.json"
     claude_theme.activate(settings)
     assert json.loads(settings.read_text())["theme"] == "custom:livery-claude"
+
+
+def test_activate_recovers_from_malformed_json(tmp_path):
+    settings = tmp_path / "settings.json"
+    settings.write_text("{not json")
+    claude_theme.activate(settings)
+    data = json.loads(settings.read_text())
+    assert data["theme"] == "custom:livery-claude"
+
+
+def test_activate_recovers_from_non_dict_json(tmp_path):
+    settings = tmp_path / "settings.json"
+    settings.write_text("[1, 2, 3]")
+    claude_theme.activate(settings)
+    data = json.loads(settings.read_text())
+    assert data["theme"] == "custom:livery-claude"

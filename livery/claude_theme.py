@@ -2,9 +2,13 @@
 het oranje + een lichter-oranje achtergrond achter jouw berichten (fullscreen).
 
 Tokennamen volgen de Claude Code theme-referentie; verifieer bij twijfel via
-`/theme` in de draaiende versie (onbekende tokens worden genegeerd)."""
+`/theme` in de draaiende versie (onbekende tokens worden genegeerd). De
+overrides die 1-op-1 overeenkomen met het ANSI-palet worden uit `palette`
+afgeleid (geen duplicaten); de theme-specifieke tokens blijven letterlijk."""
 import json
 from pathlib import Path
+
+from livery import palette
 
 SLUG = "livery-claude"
 
@@ -17,15 +21,15 @@ def theme_json():
         "name": SLUG,
         "base": "light",
         "overrides": {
-            "text": "#2B1810",
+            "text": palette.FOREGROUND,
             "inactive": "#7A5142",
             "subtle": "#8A5F4E",
             "claude": "#3A1B0E",
-            "success": "#2F5A22",
-            "error": "#7A1F12",
-            "warning": "#6B4A12",
-            "permission": "#243D66",
-            "suggestion": "#5C2450",
+            "success": palette.ANSI[2],
+            "error": palette.ANSI[1],
+            "warning": palette.ANSI[3],
+            "permission": palette.ANSI[4],
+            "suggestion": palette.ANSI[5],
             "promptBorder": "#3A1B0E",
             "userMessageBackground": _USER_BG,
         },
