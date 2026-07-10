@@ -214,12 +214,13 @@ def cmd_command_start(name, cwd, profiles_dir, store_dir,
 
 
 def cmd_commands(commands_path=DEFAULT_COMMANDS_FILE):
-    """Lijst alle commando's met hun fullscreen-vlag."""
+    """Lijst alle commando's met hun fullscreen-vlag en (optionele) run-veld."""
     cfg = commands.ensure(commands_path)
     lines = []
     for name, spec in cfg.items():
         fs = "1" if spec.get("fullscreen") else "0"
-        lines.append(f"{name}\t{fs}")
+        run = spec.get("run", "")
+        lines.append(f"{name}\t{fs}\t{run}")
     return "\n".join(lines) + ("\n" if lines else "")
 
 

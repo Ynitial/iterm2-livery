@@ -30,3 +30,9 @@ def test_ensure_writes_defaults_when_missing(tmp_path):
     assert json.loads(p.read_text())["claude"]["emoji"] == "🦀"
     assert "🦀" in p.read_text()  # literal emoji in raw bytes (ensure_ascii=False), niet \uXXXX
     assert cfg["claude"]["fullscreen"] is True
+
+
+def test_defaults_include_dev_and_watch_with_run():
+    d = commands.DEFAULT_COMMANDS
+    assert d["dev"] == {"emoji": "👷‍♂️", "bg": [255, 231, 93], "run": "npm run dev"}
+    assert d["watch"] == {"emoji": "👷‍♂️", "bg": [255, 231, 93], "run": "npm run watch"}

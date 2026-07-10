@@ -34,16 +34,18 @@ livery() {
 # via `always`) de normale look herstelt.
 _livery_define_wrappers() {
   [[ "$TERM_PROGRAM" == "iTerm.app" ]] || return 0
-  local name fs env
-  while IFS=$'\t' read -r name fs; do
+  local name fs run env exec_cmd
+  while IFS=$'\t' read -r name fs run; do
     [[ -n "$name" ]] || continue
+    unalias "$name" 2>/dev/null   # bv. dev='npm run dev' mag de functie niet overschaduwen
     env=""
     [[ "$fs" == "1" ]] && env="CLAUDE_CODE_NO_FLICKER=1 "  # fullscreen (Task 8: verifieer)
+    if [[ -n "$run" ]]; then exec_cmd="$run"; else exec_cmd="command $name"; fi
     eval "
     ${name}() {
       print -rn -- \"\$(_livery_py command-start ${name} --cwd \"\$PWD\" --session \"\$ITERM_SESSION_ID\" 2>/dev/null)\"
       {
-        ${env}command ${name} \"\$@\"
+        ${env}${exec_cmd} \"\$@\"
       } always {
         local rc=\$?
         _livery_run

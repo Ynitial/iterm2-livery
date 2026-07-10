@@ -68,7 +68,15 @@ Eenmalig instellen (schrijft een Claude Code-thema en activeert het):
 
 Claude draait in **fullscreen** (nodig voor de gekleurde achtergrond achter je eigen berichten). Andere commando's een eigen look geven? Voeg een regel toe aan `~/.config/livery/commands.json`:
 
-    { "claude": { "emoji": "🦀", "bg": [217, 119, 87], "fullscreen": true } }
+```json
+{
+  "claude": { "emoji": "🦀", "bg": [217, 119, 87], "fullscreen": true },
+  "dev":    { "emoji": "👷‍♂️", "bg": [255, 231, 93], "run": "npm run dev" },
+  "watch":  { "emoji": "👷‍♂️", "bg": [255, 231, 93], "run": "npm run watch" }
+}
+```
+
+Een commando met een `run`-veld draait dát in plaats van een gelijknamige binary, en livery neemt een gelijknamige alias over (bv. als `dev` en `watch` bij jou zsh-aliases zijn naar `npm run dev`/`npm run watch`).
 
 ## Configuratie (optioneel, via env-vars)
 
