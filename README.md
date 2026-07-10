@@ -58,6 +58,18 @@ Een leeg argument wist de naam. De tab toont **projectnaam — tabnaam** (iTerm'
 Session Name"): standaard de mapnaam, of bv. `Krabben` (project-rename) of `Krabben — dev`
 (project + tab-rename).
 
+## Claude-modus
+
+Start je `claude`, dan krijgt de tab tijdelijk een **Claude-oranje** look met een 🦀 vóór de titel — los van je projectprofiel. Sluit je claude af, dan komt de normale projectlook terug. De projecttabkleur blijft zichtbaar, zodat je bij meerdere claude-tabs ziet welk project het is.
+
+Eenmalig instellen (schrijft een Claude Code-thema en activeert het):
+
+    livery claude-setup
+
+Claude draait in **fullscreen** (nodig voor de gekleurde achtergrond achter je eigen berichten). Andere commando's een eigen look geven? Voeg een regel toe aan `~/.config/livery/commands.json`:
+
+    { "claude": { "emoji": "🦀", "bg": [217, 119, 87], "fullscreen": true } }
+
 ## Configuratie (optioneel, via env-vars)
 
 | Var | Default | Effect |
