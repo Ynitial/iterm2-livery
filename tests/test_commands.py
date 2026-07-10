@@ -28,4 +28,5 @@ def test_ensure_writes_defaults_when_missing(tmp_path):
     cfg = commands.ensure(p)
     assert p.exists()
     assert json.loads(p.read_text())["claude"]["emoji"] == "🦀"
+    assert "🦀" in p.read_text()  # literal emoji in raw bytes (ensure_ascii=False), niet \uXXXX
     assert cfg["claude"]["fullscreen"] is True
