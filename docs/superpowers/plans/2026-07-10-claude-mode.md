@@ -877,3 +877,133 @@ git commit -m "docs: README-sectie Claude-modus"
 **Placeholder-scan:** geen TBD/TODO in code-stappen; alle code is concreet. De enige "verifieer later"-punten (token-namen, fullscreen-env-var) zijn expliciet als handmatige verificatiestappen in Task 8 belegd, met concrete fallback-acties — geen code-placeholders.
 
 **Type-consistentie:** `command_profile_name`/`command_profile_file`/`build_command_profile` gelijk benoemd in Task 2, 5, 6. `commands.load`/`ensure` gelijk in Task 3, 5, 6. `claude_theme.write_theme`/`activate`/`theme_json`/`SLUG` gelijk in Task 4, 6. `_emit(entry, theme, custom=None, profile=None, title_prefix="")` consistent gebruikt in Task 5. CLI-namen (`command-start`, `commands`, `claude-setup`) consistent tussen zsh (Task 7) en `__main__` (Task 6).
+
+---
+
+### Task 10: dev/watch-wrappers (👷 geel) + `run`-veld + alias-overname
+
+**Files:**
+- Modify: `livery/commands.py` (DEFAULT_COMMANDS)
+- Modify: `livery/app.py` (`cmd_commands` output: 3e veld `run`)
+- Modify: `livery.zsh` (`_livery_define_wrappers`: 3 velden lezen, `unalias`, `run` uitvoeren)
+- Modify: `README.md` (commands.json-voorbeeld met dev/watch + uitleg `run`)
+- Test: `tests/test_commands.py`, `tests/test_app.py`
+
+**Achtergrond:** De gebruiker typt `dev` en `watch` — beide zsh-aliases naar
+`npm run dev` / `npm run watch` (geen losse binary). Een alias wordt vóór een
+functie uitgeklapt, dus livery moet de alias `unalias`en en zelf een functie
+neerzetten die het echte commando (`run`) draait. livery wordt als laatste
+gesourcet in `.zshrc`, dus `unalias` bij source-tijd blijft plakken. Geel =
+`rgb(255,231,93)` = `#FFE75D`; het bestaande donkere palet is leesbaar op geel
+(hoger contrast dan op oranje). Geen fullscreen voor dev/watch.
+
+**Interfaces:**
+- `commands.DEFAULT_COMMANDS` bevat nu ook `dev` en `watch` met een `run`-veld.
+- `cmd_commands` output-regel wordt `naam\tfullscreen\trun` (run leeg indien afwezig).
+- zsh leest 3 velden; per naam: `unalias`, dan functie die `run` (of `command <naam>`) draait.
+
+- [ ] **Step 1: Update de commands-test (RED)**
+
+```python
+# tests/test_commands.py  (voeg toe)
+def test_defaults_include_dev_and_watch_with_run():
+    d = commands.DEFAULT_COMMANDS
+    assert d["dev"] == {"emoji": "👷‍♂️", "bg": [255, 231, 93], "run": "npm run dev"}
+    assert d["watch"] == {"emoji": "👷‍♂️", "bg": [255, 231, 93], "run": "npm run watch"}
+```
+
+En pas de bestaande app-test aan het nieuwe 3-velden-formaat aan:
+
+```python
+# tests/test_app.py  — vervang de asserts in test_cmd_commands_lists_name_and_fullscreen_flag:
+def test_cmd_commands_lists_name_and_fullscreen_flag(tmp_path):
+    out = app.cmd_commands(commands_path=_cmdfile(tmp_path))
+    lines = out.splitlines()
+    assert "claude\t1\t" in lines               # fullscreen, geen run
+    assert "dev\t0\tnpm run dev" in lines        # niet-fullscreen, met run
+    assert "watch\t0\tnpm run watch" in lines
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `python3 -m pytest tests/test_commands.py tests/test_app.py -v -k "dev_and_watch or cmd_commands"`
+Expected: FAIL (defaults missen dev/watch; oude output heeft geen 3e veld).
+
+- [ ] **Step 3: Implementeer**
+
+```python
+# livery/commands.py  — vervang DEFAULT_COMMANDS:
+DEFAULT_COMMANDS = {
+    "claude": {"emoji": "🦀", "bg": [217, 119, 87], "fullscreen": True},
+    "dev": {"emoji": "👷‍♂️", "bg": [255, 231, 93], "run": "npm run dev"},
+    "watch": {"emoji": "👷‍♂️", "bg": [255, 231, 93], "run": "npm run watch"},
+}
+```
+
+```python
+# livery/app.py  — vervang cmd_commands:
+def cmd_commands(commands_path=DEFAULT_COMMANDS_FILE):
+    cfg = commands.ensure(commands_path)
+    lines = []
+    for name, spec in cfg.items():
+        fs = "1" if spec.get("fullscreen") else "0"
+        run = spec.get("run", "")
+        lines.append(f"{name}\t{fs}\t{run}")
+    return "\n".join(lines) + ("\n" if lines else "")
+```
+
+```zsh
+# livery.zsh  — vervang _livery_define_wrappers volledig:
+_livery_define_wrappers() {
+  [[ "$TERM_PROGRAM" == "iTerm.app" ]] || return 0
+  local name fs run env exec_cmd
+  while IFS=$'\t' read -r name fs run; do
+    [[ -n "$name" ]] || continue
+    unalias "$name" 2>/dev/null   # bv. dev='npm run dev' mag de functie niet overschaduwen
+    env=""
+    [[ "$fs" == "1" ]] && env="CLAUDE_CODE_NO_FLICKER=1 "  # fullscreen (Task 8: verifieer)
+    if [[ -n "$run" ]]; then exec_cmd="$run"; else exec_cmd="command $name"; fi
+    eval "
+    ${name}() {
+      print -rn -- \"\$(_livery_py command-start ${name} --cwd \"\$PWD\" --session \"\$ITERM_SESSION_ID\" 2>/dev/null)\"
+      {
+        ${env}${exec_cmd} \"\$@\"
+      } always {
+        local rc=\$?
+        _livery_run
+        return \$rc
+      }
+    }
+    "
+  done < <(_livery_py commands 2>/dev/null)
+}
+```
+
+- [ ] **Step 4: Run tests + zsh-checks**
+
+Run: `python3 -m pytest` → alle tests PASS.
+Run: `zsh -n livery.zsh` → geen output.
+Run: `TERM_PROGRAM=iTerm.app ITERM_SESSION_ID=w0t0p0 zsh -ic 'alias dev="npm run dev"; source ./livery.zsh; whence -w dev'`
+Expected: `dev: function` (de alias is overgenomen door de functie).
+
+- [ ] **Step 5: README-voorbeeld bijwerken**
+
+Vervang het commands.json-voorbeeld in de Claude-modus-sectie door:
+
+```json
+{
+  "claude": { "emoji": "🦀", "bg": [217, 119, 87], "fullscreen": true },
+  "dev":    { "emoji": "👷‍♂️", "bg": [255, 231, 93], "run": "npm run dev" },
+  "watch":  { "emoji": "👷‍♂️", "bg": [255, 231, 93], "run": "npm run watch" }
+}
+```
+
+En één regel uitleg: een commando met een `run`-veld draait dát in plaats van
+een gelijknamige binary, en livery neemt een gelijknamige alias over.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add livery/commands.py livery/app.py livery.zsh README.md tests/
+git commit -m "feat: dev/watch-wrappers (👷 geel) met run-veld en alias-overname"
+```
