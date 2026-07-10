@@ -28,6 +28,31 @@ livery() {
   print -rn -- "$out"
 }
 
+# --- commando-wrappers: tijdelijke "AI-look" per invocation (bv. `claude`) ---
+# Voor elk commando in ~/.config/livery/commands.json definiëren we een functie
+# die de look aanzet, het echte commando draait, en na afloop (ook bij Ctrl-C,
+# via `always`) de normale look herstelt.
+_livery_define_wrappers() {
+  [[ "$TERM_PROGRAM" == "iTerm.app" ]] || return 0
+  local name fs env
+  while IFS=$'\t' read -r name fs; do
+    [[ -n "$name" ]] || continue
+    env=""
+    [[ "$fs" == "1" ]] && env="CLAUDE_CODE_NO_FLICKER=1 "  # fullscreen (Task 8: verifieer)
+    eval "
+    ${name}() {
+      print -rn -- \"\$(_livery_py command-start ${name} --cwd \"\$PWD\" --session \"\$ITERM_SESSION_ID\" 2>/dev/null)\"
+      {
+        ${env}command ${name} \"\$@\"
+      } always {
+        _livery_run
+      }
+    }
+    "
+  done < <(_livery_py commands 2>/dev/null)
+}
+_livery_define_wrappers
+
 # `builtin` omzeilt een eventuele user-alias die `autoload` overschaduwt
 # (bv. `alias autoload="composer dump"`) — anders faalt het laden van add-zsh-hook.
 builtin autoload -Uz add-zsh-hook
