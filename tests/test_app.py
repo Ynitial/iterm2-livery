@@ -3,9 +3,20 @@ import os
 from livery import app, escapes, store
 from livery.profile import profile_file
 
+import json as _json
+
+from livery import commands as _commands
+from livery.profile import command_profile_name, command_profile_file
+
 
 def _dirs(tmp_path):
     return {"profiles_dir": tmp_path / "profiles", "store_dir": tmp_path / "store"}
+
+
+def _cmdfile(tmp_path, cfg=None):
+    p = tmp_path / "commands.json"
+    p.write_text(_json.dumps(cfg or _commands.DEFAULT_COMMANDS))
+    return p
 
 
 def test_emit_not_a_project_resets(tmp_path, monkeypatch):
@@ -235,3 +246,32 @@ def test_rename_project_sets_profile_label(tmp_path, make_png, monkeypatch):
     app.cmd_rename("dev", cwd=tmp_path, session_dir=sdir, session_id="t1", **d)
     assert store.read_custom(sdir, "t1") == "dev"
     assert store.read_entry(d["store_dir"], tmp_path.resolve())["label"] == "Krabben"
+
+
+def test_command_start_prefixes_emoji_and_switches_profile(tmp_path, make_png, monkeypatch):
+    monkeypatch.setattr(app, "detect_theme", lambda: "dark")
+    monkeypatch.setattr(app, "color_from_png", lambda p: (40, 80, 200))
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "site.webmanifest").write_text('{"icons":[{"src":"a.png"}]}')
+    make_png(tmp_path / "a.png", (40, 80, 200))
+    d = _dirs(tmp_path)
+    app.cmd_emit(cwd=tmp_path, **d)  # projectprofiel + store vullen
+
+    out = app.cmd_command_start(
+        "claude", cwd=tmp_path, session_dir=tmp_path / "s", session_id=None,
+        commands_path=_cmdfile(tmp_path), **d,
+    )
+
+    # Wisselt naar het commando-profiel en zet 🦀 vóór de projectnaam.
+    assert f"SetProfile={command_profile_name('claude')}\007" in out
+    assert f"]0;🦀 {tmp_path.resolve().name}\007" in out
+    # Commando-profielbestand is geschreven.
+    assert command_profile_file(d["profiles_dir"], "claude").exists()
+
+
+def test_command_start_unknown_command_returns_empty(tmp_path):
+    out = app.cmd_command_start(
+        "nope", cwd=tmp_path, session_dir=tmp_path / "s", session_id=None,
+        commands_path=_cmdfile(tmp_path), **_dirs(tmp_path),
+    )
+    assert out == ""

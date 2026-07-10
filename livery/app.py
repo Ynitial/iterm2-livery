@@ -2,11 +2,12 @@ import os
 import time
 from pathlib import Path
 
-from livery import escapes, store
+from livery import commands, escapes, store
 from livery.color import color_from_png
 from livery.manifest import find_manifest, first_png
 from livery.profile import (
-    build_profile, default_inherited_settings, profile_file, write_profile,
+    build_profile, build_command_profile, command_profile_name,
+    command_profile_file, default_inherited_settings, profile_file, write_profile,
 )
 from livery.roots import find_project_root
 from livery.tint import detect_theme, mute
@@ -15,6 +16,7 @@ from livery.title import root_name
 DEFAULT_STORE = Path.home() / ".config" / "livery" / "dirs"
 DEFAULT_SESSIONS = Path.home() / ".config" / "livery" / "sessions"
 DEFAULT_PROFILES = Path.home() / "Library" / "Application Support" / "iTerm2" / "DynamicProfiles"
+DEFAULT_COMMANDS_FILE = Path.home() / ".config" / "livery" / "commands.json"
 
 
 def _tab_strength():
@@ -70,22 +72,19 @@ def _ensure_profile(profiles_dir, entry, theme):
     time.sleep(_profile_delay())  # geef iTerm2 tijd om het profiel in te laden
 
 
-def _emit(entry, theme, custom=None):
-    """Escape-output: eerst de profiel-switch/kleur, dán de sessienaam (titel).
-
-    De profielnaam (= mapnaam) toont iTerm via de "Profile Name"-component; de
-    sessienaam die wij hier zetten is de per-tab `rename` (Session Name-component).
-    Titel als laatste, want SetProfile reset de sessienaam.
-    """
+def _emit(entry, theme, custom=None, profile=None, title_prefix=""):
+    """Escape-output. `profile` overschrijft de profielnaam (bv. het
+    commando-profiel); `title_prefix` plakt bv. '🦀 ' vóór de titel."""
     if entry.get("icon_path") and entry.get("dominant_color"):
         rgb = tuple(entry["dominant_color"])
-        out = escapes.set_profile(_profile_label(entry))
+        out = escapes.set_profile(profile or _profile_label(entry))
         out += escapes.tab_color(mute(rgb, theme, _tab_strength()))
+    elif profile:
+        out = escapes.set_profile(profile) + escapes.reset_tab_color()
     else:
         out = escapes.default_look()
-    # Geen tab-rename? Dan sessienaam = profielnaam, zodat "Profile & Session Name"
-    # samenvalt tot één naam (anders bv. "Krabben — vanderkrabben").
-    out += escapes.title(custom or _profile_label(entry))
+    base = custom or _profile_label(entry)
+    out += escapes.title(f"{title_prefix}{base}")
     return out
 
 
@@ -183,3 +182,30 @@ def cmd_clean(profiles_dir, store_dir):
                 pf.unlink()
             removed.append(root)
     return removed
+
+
+def _ensure_command_profile(profiles_dir, name, bg_hex):
+    if not command_profile_file(profiles_dir, name).exists():
+        write_profile(profiles_dir, build_command_profile(name, bg_hex))
+        time.sleep(_profile_delay())
+
+
+def cmd_command_start(name, cwd, profiles_dir, store_dir,
+                      session_dir=DEFAULT_SESSIONS, session_id=None,
+                      commands_path=DEFAULT_COMMANDS_FILE):
+    """Emit de tijdelijke commando-look: wissel naar het oranje profiel, behoud
+    de projecttabkleur, en zet de commando-emoji vóór de titel."""
+    cfg = commands.load(commands_path).get(name)
+    if not cfg:
+        return ""
+    r, g, b = cfg.get("bg", [217, 119, 87])
+    bg_hex = f"#{r:02X}{g:02X}{b:02X}"
+    emoji = cfg.get("emoji", "")
+    _ensure_command_profile(profiles_dir, name, bg_hex)
+
+    theme = detect_theme()
+    root = find_project_root(cwd)
+    entry = store.read_entry(store_dir, root) or _detect(root) or {"root": str(root)}
+    custom = store.read_custom(session_dir, session_id)
+    prefix = f"{emoji} " if emoji else ""
+    return _emit(entry, theme, custom, profile=command_profile_name(name), title_prefix=prefix)
