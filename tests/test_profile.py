@@ -93,3 +93,12 @@ def test_build_command_profile_forces_orange_regardless_of_theme():
     for i in range(16):
         assert f"Ansi {i} Color" in p
     assert p["Dynamic Profile Parent Name"] == "Default"
+
+
+def test_build_command_profile_uses_given_bg():
+    p = build_command_profile("dev", "#FFE75D")
+    bg = p["Background Color"]
+    assert round(bg["Red Component"] * 255) == 255
+    assert round(bg["Green Component"] * 255) == 231
+    assert round(bg["Blue Component"] * 255) == 93
+    assert p["Name"] == command_profile_name("dev")

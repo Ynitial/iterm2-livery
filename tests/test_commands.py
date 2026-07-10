@@ -36,3 +36,28 @@ def test_defaults_include_dev_and_watch_with_run():
     d = commands.DEFAULT_COMMANDS
     assert d["dev"] == {"emoji": "👷‍♂️", "bg": [255, 231, 93], "run": "npm run dev"}
     assert d["watch"] == {"emoji": "👷‍♂️", "bg": [255, 231, 93], "run": "npm run watch"}
+
+
+def test_load_merges_defaults_into_stale_user_file(tmp_path):
+    # Regressie: een gebruiker-config van vóór de introductie van dev/watch
+    # mag die nieuwe commando's niet stilzwijgend laten verdwijnen.
+    p = tmp_path / "commands.json"
+    p.write_text(json.dumps({"claude": {"emoji": "🦀", "bg": [217, 119, 87], "fullscreen": True}}))
+    cfg = commands.load(p)
+    assert "dev" in cfg
+    assert "watch" in cfg
+
+
+def test_load_user_entry_overrides_default(tmp_path):
+    p = tmp_path / "commands.json"
+    p.write_text(json.dumps({"claude": {"emoji": "X", "bg": [1, 2, 3], "fullscreen": False}}))
+    cfg = commands.load(p)
+    assert cfg["claude"]["emoji"] == "X"
+    assert "dev" in cfg
+
+
+def test_load_does_not_mutate_module_defaults(tmp_path):
+    p = tmp_path / "commands.json"
+    p.write_text(json.dumps({"claude": {"emoji": "X", "bg": [1, 2, 3], "fullscreen": False}}))
+    commands.load(p)
+    assert commands.DEFAULT_COMMANDS["claude"]["emoji"] == "🦀"
