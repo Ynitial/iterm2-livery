@@ -2,6 +2,7 @@ import os
 
 from livery import app, escapes, store
 from livery.profile import profile_file
+from livery.tint import mute
 
 import json as _json
 
@@ -267,6 +268,8 @@ def test_command_start_prefixes_emoji_and_switches_profile(tmp_path, make_png, m
     assert f"]0;🦀 {tmp_path.resolve().name}\007" in out
     # Commando-profielbestand is geschreven.
     assert command_profile_file(d["profiles_dir"], "claude").exists()
+    # Project-tabkleur blijft behouden (niet vervangen door oranje bg).
+    assert escapes.tab_color(mute((40, 80, 200), "dark", 1.0)) in out
 
 
 def test_command_start_unknown_command_returns_empty(tmp_path):
@@ -275,3 +278,21 @@ def test_command_start_unknown_command_returns_empty(tmp_path):
         commands_path=_cmdfile(tmp_path), **_dirs(tmp_path),
     )
     assert out == ""
+
+
+def test_command_start_non_project_falls_back_to_reset_tab_color(tmp_path, monkeypatch):
+    monkeypatch.setattr(app, "detect_theme", lambda: "dark")
+    d = _dirs(tmp_path)
+
+    out = app.cmd_command_start(
+        "claude", cwd=tmp_path, session_dir=tmp_path / "s", session_id=None,
+        commands_path=_cmdfile(tmp_path), **d,
+    )
+
+    # Wisselt naar het commando-profiel.
+    assert f"SetProfile={command_profile_name('claude')}\007" in out
+    # Geen project: tab-kleur resetten.
+    assert escapes.reset_tab_color() in out
+    # Titel geeft aan dat we in een commando zijn (🦀 prefix), geen project-tabkleur.
+    assert "]0;🦀 " in out
+    assert ";bg;red;brightness;" not in out
