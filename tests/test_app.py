@@ -296,3 +296,16 @@ def test_command_start_non_project_falls_back_to_reset_tab_color(tmp_path, monke
     # Titel geeft aan dat we in een commando zijn (🦀 prefix), geen project-tabkleur.
     assert "]0;🦀 " in out
     assert ";bg;red;brightness;" not in out
+
+
+def test_cmd_commands_lists_name_and_fullscreen_flag(tmp_path):
+    out = app.cmd_commands(commands_path=_cmdfile(tmp_path))
+    assert "claude\t1" in out.splitlines()
+
+
+def test_cmd_claude_setup_writes_theme_and_activates(tmp_path):
+    themes = tmp_path / "themes"
+    settings = tmp_path / "settings.json"
+    app.cmd_claude_setup(themes_dir=themes, settings_path=settings)
+    assert (themes / "livery-claude.json").exists()
+    assert _json.loads(settings.read_text())["theme"] == "custom:livery-claude"

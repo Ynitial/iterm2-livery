@@ -2,7 +2,7 @@ import os
 import time
 from pathlib import Path
 
-from livery import commands, escapes, store
+from livery import claude_theme, commands, escapes, store
 from livery.color import color_from_png
 from livery.manifest import find_manifest, first_png
 from livery.profile import (
@@ -17,6 +17,8 @@ DEFAULT_STORE = Path.home() / ".config" / "livery" / "dirs"
 DEFAULT_SESSIONS = Path.home() / ".config" / "livery" / "sessions"
 DEFAULT_PROFILES = Path.home() / "Library" / "Application Support" / "iTerm2" / "DynamicProfiles"
 DEFAULT_COMMANDS_FILE = Path.home() / ".config" / "livery" / "commands.json"
+DEFAULT_THEMES = Path.home() / ".claude" / "themes"
+DEFAULT_SETTINGS_FILE = Path.home() / ".claude" / "settings.json"
 
 
 def _tab_strength():
@@ -209,3 +211,20 @@ def cmd_command_start(name, cwd, profiles_dir, store_dir,
     custom = store.read_custom(session_dir, session_id)
     prefix = f"{emoji} " if emoji else ""
     return _emit(entry, theme, custom, profile=command_profile_name(name), title_prefix=prefix)
+
+
+def cmd_commands(commands_path=DEFAULT_COMMANDS_FILE):
+    """Lijst alle commando's met hun fullscreen-vlag."""
+    cfg = commands.ensure(commands_path)
+    lines = []
+    for name, spec in cfg.items():
+        fs = "1" if spec.get("fullscreen") else "0"
+        lines.append(f"{name}\t{fs}")
+    return "\n".join(lines) + ("\n" if lines else "")
+
+
+def cmd_claude_setup(themes_dir=DEFAULT_THEMES, settings_path=DEFAULT_SETTINGS_FILE):
+    """Schrijf het Claude-thema en activeer het."""
+    path = claude_theme.write_theme(themes_dir)
+    claude_theme.activate(settings_path)
+    return f"livery-claude thema geschreven ({path}) en geactiveerd in {settings_path}\n"
