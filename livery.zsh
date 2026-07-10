@@ -45,7 +45,9 @@ _livery_define_wrappers() {
       {
         ${env}command ${name} \"\$@\"
       } always {
+        local rc=\$?
         _livery_run
+        return \$rc
       }
     }
     "
