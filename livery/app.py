@@ -2,12 +2,11 @@ import os
 import time
 from pathlib import Path
 
-from livery import claude_theme, commands, escapes, store
+from livery import claude_theme, commands, escapes, palette, store
 from livery.color import color_from_png
 from livery.manifest import find_manifest, first_png
 from livery.profile import (
-    build_profile, build_command_profile, command_profile_name,
-    command_profile_file, default_inherited_settings, profile_file, write_profile,
+    build_profile, default_inherited_settings, profile_file, write_profile,
 )
 from livery.roots import find_project_root
 from livery.tint import detect_theme, mute
@@ -186,31 +185,33 @@ def cmd_clean(profiles_dir, store_dir):
     return removed
 
 
-def _ensure_command_profile(profiles_dir, name, bg_hex):
-    if not command_profile_file(profiles_dir, name).exists():
-        write_profile(profiles_dir, build_command_profile(name, bg_hex))
-        time.sleep(_profile_delay())
+def cmd_command_start(name, commands_path=DEFAULT_COMMANDS_FILE):
+    """Emit de tijdelijke commando-look als OSC-tint op de HUIDIGE sessie.
 
-
-def cmd_command_start(name, cwd, profiles_dir, store_dir,
-                      session_dir=DEFAULT_SESSIONS, session_id=None,
-                      commands_path=DEFAULT_COMMANDS_FILE):
-    """Emit de tijdelijke commando-look: wissel naar het oranje profiel, behoud
-    de projecttabkleur, en zet de commando-emoji vóór de titel."""
+    Bewust géén profielwissel: zo blijven de favicon, de projectnaam én het
+    profiel intact. We tinten achtergrond + voorgrond + het 16-kleuren palet
+    naar de commandokleur, kleuren de tab in diezelfde kleur, en zetten enkel
+    de emoji als sessienaam (het profiel levert al de projectnaam, dus de tab
+    toont bv. 'ICT&H: 👷'). Reset via cmd_command_end + _livery_run."""
     cfg = commands.load(commands_path).get(name)
     if not cfg:
         return ""
     r, g, b = cfg.get("bg", [217, 119, 87])
     bg_hex = f"#{r:02X}{g:02X}{b:02X}"
     emoji = cfg.get("emoji", "")
-    _ensure_command_profile(profiles_dir, name, bg_hex)
+    out = escapes.fg_color(palette.FOREGROUND) + escapes.bg_color(bg_hex)
+    for i, hexcol in enumerate(palette.ANSI):
+        out += escapes.ansi_color(i, hexcol)
+    out += escapes.tab_color((r, g, b))  # tab-rand in de commandokleur
+    if emoji:
+        out += escapes.title(emoji)     # sessienaam = alleen de emoji
+    return out
 
-    theme = detect_theme()
-    root = find_project_root(cwd)
-    entry = store.read_entry(store_dir, root) or _detect(root) or {"root": str(root)}
-    custom = store.read_custom(session_dir, session_id)
-    prefix = f"{emoji} " if emoji else ""
-    return _emit(entry, theme, custom, profile=command_profile_name(name), title_prefix=prefix)
+
+def cmd_command_end():
+    """Herstel de getinte kleuren naar de profiel-defaults (einde commando-look).
+    Tabkleur en titel worden door de aansluitende _livery_run hersteld."""
+    return escapes.reset_colors()
 
 
 def cmd_commands(commands_path=DEFAULT_COMMANDS_FILE):

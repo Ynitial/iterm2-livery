@@ -25,6 +25,7 @@ def main(argv=None):
     sub.add_parser("clean", parents=[common])
     p_cmd = sub.add_parser("command-start", parents=[common])
     p_cmd.add_argument("name")
+    sub.add_parser("command-end", parents=[common])
     sub.add_parser("commands", parents=[common])
     sub.add_parser("claude-setup", parents=[common])
 
@@ -44,7 +45,9 @@ def main(argv=None):
         for root in app.cmd_clean(**dirs):
             sys.stderr.write(f"removed {root}\n")
     elif a.cmd == "command-start":
-        sys.stdout.write(app.cmd_command_start(a.name, cwd=a.cwd, **dirs, **sess))
+        sys.stdout.write(app.cmd_command_start(a.name))
+    elif a.cmd == "command-end":
+        sys.stdout.write(app.cmd_command_end())
     elif a.cmd == "commands":
         sys.stdout.write(app.cmd_commands())
     elif a.cmd == "claude-setup":

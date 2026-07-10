@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 DEFAULT_COMMANDS = {
-    "claude": {"emoji": "🦀", "bg": [217, 119, 87], "fullscreen": True},
+    "claude": {"emoji": "🦀", "bg": [240, 156, 132], "fullscreen": True},
     "dev": {"emoji": "👷‍♂️", "bg": [255, 231, 93], "run": "npm run dev"},
     "watch": {"emoji": "👷‍♂️", "bg": [255, 231, 93], "run": "npm run watch"},
 }

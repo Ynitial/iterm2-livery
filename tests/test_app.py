@@ -1,13 +1,9 @@
 import os
 
-from livery import app, escapes, store
-from livery.profile import profile_file
-from livery.tint import mute
-
 import json as _json
 
-from livery import commands as _commands
-from livery.profile import command_profile_name, command_profile_file
+from livery import app, commands as _commands, escapes, palette, store
+from livery.profile import profile_file
 
 
 def _dirs(tmp_path):
@@ -249,53 +245,35 @@ def test_rename_project_sets_profile_label(tmp_path, make_png, monkeypatch):
     assert store.read_entry(d["store_dir"], tmp_path.resolve())["label"] == "Krabben"
 
 
-def test_command_start_prefixes_emoji_and_switches_profile(tmp_path, make_png, monkeypatch):
-    monkeypatch.setattr(app, "detect_theme", lambda: "dark")
-    monkeypatch.setattr(app, "color_from_png", lambda p: (40, 80, 200))
-    (tmp_path / ".git").mkdir()
-    (tmp_path / "site.webmanifest").write_text('{"icons":[{"src":"a.png"}]}')
-    make_png(tmp_path / "a.png", (40, 80, 200))
-    d = _dirs(tmp_path)
-    app.cmd_emit(cwd=tmp_path, **d)  # projectprofiel + store vullen
+def test_command_start_tints_and_sets_emoji_title_without_profile_switch(tmp_path):
+    out = app.cmd_command_start("claude", commands_path=_cmdfile(tmp_path))
 
-    out = app.cmd_command_start(
-        "claude", cwd=tmp_path, session_dir=tmp_path / "s", session_id=None,
-        commands_path=_cmdfile(tmp_path), **d,
-    )
+    # OSC-tint op de huidige sessie: oranje achtergrond + donkere voorgrond + palet.
+    assert escapes.bg_color("#F09C84") in out
+    assert escapes.fg_color(palette.FOREGROUND) in out
+    assert escapes.ansi_color(0, palette.ANSI[0]) in out
+    assert escapes.ansi_color(15, palette.ANSI[15]) in out
+    # Tab-rand in de commandokleur (oranje).
+    assert escapes.tab_color((240, 156, 132)) in out
+    # Sessienaam = alleen de emoji (projectnaam komt van het profiel).
+    assert "]0;🦀\007" in out
+    # Geen profielwissel: favicon/profiel/projectnaam blijven intact.
+    assert "SetProfile" not in out
 
-    # Wisselt naar het commando-profiel en zet 🦀 vóór de projectnaam.
-    assert f"SetProfile={command_profile_name('claude')}\007" in out
-    assert f"]0;🦀 {tmp_path.resolve().name}\007" in out
-    # Commando-profielbestand is geschreven.
-    assert command_profile_file(d["profiles_dir"], "claude").exists()
-    # Project-tabkleur blijft behouden (niet vervangen door oranje bg).
-    assert escapes.tab_color(mute((40, 80, 200), "dark", 1.0)) in out
+
+def test_command_start_dev_tints_yellow(tmp_path):
+    out = app.cmd_command_start("dev", commands_path=_cmdfile(tmp_path))
+    assert escapes.bg_color("#FFE75D") in out
+    assert escapes.tab_color((255, 231, 93)) in out
+    assert "]0;👷" in out  # dev-emoji als sessienaam
 
 
 def test_command_start_unknown_command_returns_empty(tmp_path):
-    out = app.cmd_command_start(
-        "nope", cwd=tmp_path, session_dir=tmp_path / "s", session_id=None,
-        commands_path=_cmdfile(tmp_path), **_dirs(tmp_path),
-    )
-    assert out == ""
+    assert app.cmd_command_start("nope", commands_path=_cmdfile(tmp_path)) == ""
 
 
-def test_command_start_non_project_falls_back_to_reset_tab_color(tmp_path, monkeypatch):
-    monkeypatch.setattr(app, "detect_theme", lambda: "dark")
-    d = _dirs(tmp_path)
-
-    out = app.cmd_command_start(
-        "claude", cwd=tmp_path, session_dir=tmp_path / "s", session_id=None,
-        commands_path=_cmdfile(tmp_path), **d,
-    )
-
-    # Wisselt naar het commando-profiel.
-    assert f"SetProfile={command_profile_name('claude')}\007" in out
-    # Geen project: tab-kleur resetten.
-    assert escapes.reset_tab_color() in out
-    # Titel geeft aan dat we in een commando zijn (🦀 prefix), geen project-tabkleur.
-    assert "]0;🦀 " in out
-    assert ";bg;red;brightness;" not in out
+def test_command_end_resets_colors():
+    assert app.cmd_command_end() == escapes.reset_colors()
 
 
 def test_cmd_commands_lists_name_and_fullscreen_flag(tmp_path):

@@ -41,21 +41,30 @@ _livery_define_wrappers() {
     env=""
     [[ "$fs" == "1" ]] && env="CLAUDE_CODE_NO_FLICKER=1 "  # fullscreen (Task 8: verifieer)
     if [[ -n "$run" ]]; then exec_cmd="$run"; else exec_cmd="command $name"; fi
+    # De commando-look (tint) blijft staan tijdens het commando; de cleanup
+    # loopt via de precmd-hook hieronder — die draait gegarandeerd vóór de
+    # volgende prompt, óók na Ctrl-C (waar een `always`-blok onbetrouwbaar is).
     eval "
     ${name}() {
-      print -rn -- \"\$(_livery_py command-start ${name} --cwd \"\$PWD\" --session \"\$ITERM_SESSION_ID\" 2>/dev/null)\"
-      {
-        ${env}${exec_cmd} \"\$@\"
-      } always {
-        local rc=\$?
-        _livery_run
-        return \$rc
-      }
+      print -rn -- \"\$(_livery_py command-start ${name} 2>/dev/null)\"
+      typeset -g _LIVERY_CMD_ACTIVE=1
+      ${env}${exec_cmd} \"\$@\"
     }
     "
   done < <(_livery_py commands 2>/dev/null)
 }
 _livery_define_wrappers
+
+# Cleanup ná een gewrapt commando: reset de getinte kleuren en her-emit de
+# normale look. Draait vóór elke prompt, maar doet alleen iets als er net een
+# commando-look actief was — zo vangen we ook Ctrl-C/afbreken netjes af.
+_livery_cmd_cleanup() {
+  [[ -n "$_LIVERY_CMD_ACTIVE" ]] || return 0
+  unset _LIVERY_CMD_ACTIVE
+  print -rn -- "$(_livery_py command-end 2>/dev/null)"
+  _livery_run
+}
+add-zsh-hook precmd _livery_cmd_cleanup
 
 # `builtin` omzeilt een eventuele user-alias die `autoload` overschaduwt
 # (bv. `alias autoload="composer dump"`) — anders faalt het laden van add-zsh-hook.

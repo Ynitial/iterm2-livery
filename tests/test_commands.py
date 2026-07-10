@@ -6,7 +6,7 @@ from livery import commands
 def test_load_missing_returns_defaults(tmp_path):
     cfg = commands.load(tmp_path / "nope.json")
     assert cfg["claude"]["emoji"] == "🦀"
-    assert cfg["claude"]["bg"] == [217, 119, 87]
+    assert cfg["claude"]["bg"] == [240, 156, 132]
     assert cfg["claude"]["fullscreen"] is True
 
 

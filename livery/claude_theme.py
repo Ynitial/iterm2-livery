@@ -12,8 +12,9 @@ from livery import palette
 
 SLUG = "livery-claude"
 
-# Lichter oranje (≈30% richting wit) voor userMessageBackground.
-_USER_BG = "#E4A089"
+# Lichter dan de claude-achtergrond (#F09C84) voor userMessageBackground,
+# zodat jouw eigen berichten een zacht lichter vlak krijgen.
+_USER_BG = "#F6C4B5"
 
 
 def theme_json():
