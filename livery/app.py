@@ -199,9 +199,12 @@ def cmd_command_start(name, commands_path=DEFAULT_COMMANDS_FILE):
     r, g, b = cfg.get("bg", [217, 119, 87])
     bg_hex = f"#{r:02X}{g:02X}{b:02X}"
     emoji = cfg.get("emoji", "")
-    out = escapes.fg_color(palette.FOREGROUND) + escapes.bg_color(bg_hex)
-    for i, hexcol in enumerate(palette.ANSI):
-        out += escapes.ansi_color(i, hexcol)
+    out = escapes.fg_color(palette.foreground_for(bg_hex)) + escapes.bg_color(bg_hex)
+    # Het donkere ANSI-palet past alléén op lichte achtergronden; op een donkere
+    # achtergrond zou het onleesbaar zijn, dus laten we dan het profiel-palet staan.
+    if not palette.is_dark(bg_hex):
+        for i, hexcol in enumerate(palette.ANSI):
+            out += escapes.ansi_color(i, hexcol)
     out += escapes.tab_color((r, g, b))  # tab-rand in de commandokleur
     if emoji:
         out += escapes.title(emoji)     # sessienaam = alleen de emoji

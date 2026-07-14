@@ -1,8 +1,12 @@
 """Kleuren voor de Claude-modus: een oranje achtergrond met een donker,
 leesbaar ANSI-palet (donkere tekst op oranje = een 'light'-achtige look)."""
 
-BG = "#D97757"          # Claude-oranje, rgb(217,119,87)
-FOREGROUND = "#2B1810"  # donkerbruin; contrast ~5.4 op het oranje
+BG = "#D97757"          # referentie-oranje voor de contrast-vloer van het palet
+FOREGROUND = "#2B1810"  # donkere tekst voor LICHTE achtergronden (oranje/geel)
+FOREGROUND_ON_DARK = "#F3E7E0"  # lichte tekst voor DONKERE achtergronden (bv. #57392F)
+
+# Onder deze luminantie is een achtergrond "donker" en gebruiken we lichte tekst.
+_DARK_BG_THRESHOLD = 0.18
 
 # 16 ANSI-kleuren, bewust donker/verzadigd zodat álle tekst leesbaar blijft op
 # het oranje; onderscheid zit in de tint, niet in de helderheid.
@@ -44,3 +48,14 @@ def contrast_ratio(hex_a, hex_b):
     la, lb = _luminance(hex_a), _luminance(hex_b)
     hi, lo = max(la, lb), min(la, lb)
     return (hi + 0.05) / (lo + 0.05)
+
+
+def is_dark(bg_hex):
+    """True als de achtergrond donker genoeg is om lichte tekst te vragen."""
+    return _luminance(bg_hex) < _DARK_BG_THRESHOLD
+
+
+def foreground_for(bg_hex):
+    """Kies leesbare voorgrondkleur bij een achtergrond: licht op donker,
+    donker op licht."""
+    return FOREGROUND_ON_DARK if is_dark(bg_hex) else FOREGROUND

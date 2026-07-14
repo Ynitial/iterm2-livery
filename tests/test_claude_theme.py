@@ -3,20 +3,20 @@ import json
 from livery import claude_theme
 
 
-def test_theme_json_is_light_based_with_lighter_orange_user_bg():
+def test_theme_json_is_dark_based_with_light_text_and_user_bg():
     t = claude_theme.theme_json()
     assert t["name"] == "livery-claude"
-    assert t["base"] == "light"
+    assert t["base"] == "dark"
     ov = t["overrides"]
-    # Jouw verzonden berichten: een lichter oranje dan de achtergrond.
+    # Donkere achtergrond → lichte tekst en een eigen-berichten-vlak.
     assert ov["userMessageBackground"].startswith("#")
-    assert "text" in ov
+    assert ov["text"] == "#F3E7E0"
 
 
 def test_write_theme_creates_file(tmp_path):
     path = claude_theme.write_theme(tmp_path)
     assert path == tmp_path / "livery-claude.json"
-    assert json.loads(path.read_text())["base"] == "light"
+    assert json.loads(path.read_text())["base"] == "dark"
 
 
 def test_activate_merges_and_preserves_existing_settings(tmp_path):

@@ -245,25 +245,27 @@ def test_rename_project_sets_profile_label(tmp_path, make_png, monkeypatch):
     assert store.read_entry(d["store_dir"], tmp_path.resolve())["label"] == "Krabben"
 
 
-def test_command_start_tints_and_sets_emoji_title_without_profile_switch(tmp_path):
+def test_command_start_claude_dark_bg_uses_light_fg_and_no_palette(tmp_path):
     out = app.cmd_command_start("claude", commands_path=_cmdfile(tmp_path))
 
-    # OSC-tint op de huidige sessie: oranje achtergrond + donkere voorgrond + palet.
-    assert escapes.bg_color("#F09C84") in out
-    assert escapes.fg_color(palette.FOREGROUND) in out
-    assert escapes.ansi_color(0, palette.ANSI[0]) in out
-    assert escapes.ansi_color(15, palette.ANSI[15]) in out
-    # Tab-rand in de commandokleur (oranje).
-    assert escapes.tab_color((240, 156, 132)) in out
+    # Donkere achtergrond → lichte voorgrond, en GEEN donker palet.
+    assert escapes.bg_color("#18242C") in out
+    assert escapes.fg_color(palette.FOREGROUND_ON_DARK) in out
+    assert escapes.ansi_color(0, palette.ANSI[0]) not in out
+    # Tab-rand in de commandokleur.
+    assert escapes.tab_color((24, 36, 44)) in out
     # Sessienaam = alleen de emoji (projectnaam komt van het profiel).
     assert "]0;🦀\007" in out
     # Geen profielwissel: favicon/profiel/projectnaam blijven intact.
     assert "SetProfile" not in out
 
 
-def test_command_start_dev_tints_yellow(tmp_path):
+def test_command_start_dev_light_bg_uses_dark_fg_and_palette(tmp_path):
     out = app.cmd_command_start("dev", commands_path=_cmdfile(tmp_path))
+    # Gele (lichte) achtergrond → donkere voorgrond + donker palet.
     assert escapes.bg_color("#FFE75D") in out
+    assert escapes.fg_color(palette.FOREGROUND) in out
+    assert escapes.ansi_color(0, palette.ANSI[0]) in out
     assert escapes.tab_color((255, 231, 93)) in out
     assert "]0;👷" in out  # dev-emoji als sessienaam
 

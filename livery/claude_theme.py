@@ -1,37 +1,37 @@
-"""Claude Code custom-thema voor de Claude-modus: donkere, leesbare tekst op
-het oranje + een lichter-oranje achtergrond achter jouw berichten (fullscreen).
+"""Claude Code custom-thema voor de Claude-modus: lichte, leesbare tekst op de
+donkerblauwe claude-achtergrond (#18242C) + een iets lichter-blauw vlak
+achter jouw berichten (fullscreen).
 
 Tokennamen volgen de Claude Code theme-referentie; verifieer bij twijfel via
-`/theme` in de draaiende versie (onbekende tokens worden genegeerd). De
-overrides die 1-op-1 overeenkomen met het ANSI-palet worden uit `palette`
-afgeleid (geen duplicaten); de theme-specifieke tokens blijven letterlijk."""
+`/theme` in de draaiende versie (onbekende tokens worden genegeerd). Omdat de
+achtergrond donker is, gebruikt dit thema `base: dark` met lichte tokens —
+het donkere ANSI-palet uit `palette` past hier niet, dus de kleuren zijn
+theme-specifiek en letterlijk."""
 import json
 from pathlib import Path
 
-from livery import palette
-
 SLUG = "livery-claude"
 
-# Lichter dan de claude-achtergrond (#F09C84) voor userMessageBackground,
-# zodat jouw eigen berichten een zacht lichter vlak krijgen.
-_USER_BG = "#F6C4B5"
+# Iets lichter dan de claude-achtergrond (#18242C) voor userMessageBackground,
+# zodat jouw eigen berichten een zacht opgelicht vlak krijgen.
+_USER_BG = "#1F2D37"
 
 
 def theme_json():
     return {
         "name": SLUG,
-        "base": "light",
+        "base": "dark",
         "overrides": {
-            "text": palette.FOREGROUND,
-            "inactive": "#7A5142",
-            "subtle": "#8A5F4E",
-            "claude": "#3A1B0E",
-            "success": palette.ANSI[2],
-            "error": palette.ANSI[1],
-            "warning": palette.ANSI[3],
-            "permission": palette.ANSI[4],
-            "suggestion": palette.ANSI[5],
-            "promptBorder": "#3A1B0E",
+            "text": "#F3E7E0",
+            "inactive": "#B39B8E",
+            "subtle": "#A2897C",
+            "claude": "#F0B99E",
+            "success": "#9FCF7F",
+            "error": "#F09A88",
+            "warning": "#E6B95F",
+            "permission": "#9EB8E8",
+            "suggestion": "#D0A6C8",
+            "promptBorder": "#F0B99E",
             "userMessageBackground": _USER_BG,
         },
     }

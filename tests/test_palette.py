@@ -23,3 +23,13 @@ def test_all_ansi_colors_stay_legible_on_yellow():
     for hexcol in palette.ANSI:
         assert palette.contrast_ratio(hexcol, "#FFE75D") >= 1.8, hexcol
     assert palette.contrast_ratio(palette.FOREGROUND, "#FFE75D") >= 1.8
+
+
+def test_foreground_choice_follows_background_lightness():
+    # Donkere achtergrond (claude-blauw) → lichte tekst; lichte → donkere tekst.
+    assert palette.is_dark("#18242C") is True
+    assert palette.is_dark("#FFE75D") is False
+    assert palette.foreground_for("#18242C") == palette.FOREGROUND_ON_DARK
+    assert palette.foreground_for("#FFE75D") == palette.FOREGROUND
+    # De lichte tekst is ruim leesbaar op de donkerblauwe achtergrond.
+    assert palette.contrast_ratio(palette.FOREGROUND_ON_DARK, "#18242C") >= 4.5

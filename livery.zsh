@@ -64,10 +64,11 @@ _livery_cmd_cleanup() {
   print -rn -- "$(_livery_py command-end 2>/dev/null)"
   _livery_run
 }
-add-zsh-hook precmd _livery_cmd_cleanup
 
 # `builtin` omzeilt een eventuele user-alias die `autoload` overschaduwt
 # (bv. `alias autoload="composer dump"`) — anders faalt het laden van add-zsh-hook.
+# Moet vóór elk `add-zsh-hook`-gebruik hieronder staan.
 builtin autoload -Uz add-zsh-hook
+add-zsh-hook precmd _livery_cmd_cleanup
 add-zsh-hook chpwd _livery_run
 _livery_run   # bij startup
