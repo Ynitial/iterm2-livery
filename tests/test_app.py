@@ -252,8 +252,8 @@ def test_command_start_claude_dark_bg_uses_light_fg_and_no_palette(tmp_path):
     assert escapes.bg_color("#18242C") in out
     assert escapes.fg_color(palette.FOREGROUND_ON_DARK) in out
     assert escapes.ansi_color(0, palette.ANSI[0]) not in out
-    # Tab-rand in de commandokleur.
-    assert escapes.tab_color((24, 36, 44)) in out
+    # Tab behoudt de projectkleur: géén tabkleur-escape (OSC 6).
+    assert "]6;1;bg;" not in out
     # Sessienaam = alleen de emoji (projectnaam komt van het profiel).
     assert "]0;🦀\007" in out
     # Geen profielwissel: favicon/profiel/projectnaam blijven intact.
@@ -266,8 +266,16 @@ def test_command_start_dev_light_bg_uses_dark_fg_and_palette(tmp_path):
     assert escapes.bg_color("#FFE75D") in out
     assert escapes.fg_color(palette.FOREGROUND) in out
     assert escapes.ansi_color(0, palette.ANSI[0]) in out
-    assert escapes.tab_color((255, 231, 93)) in out
+    assert "]6;1;bg;" not in out  # projectkleur op de tab blijft staan
     assert "]0;👷" in out  # dev-emoji als sessienaam
+
+
+def test_command_start_tab_opt_in_colors_tab(tmp_path):
+    import json
+    p = tmp_path / "commands.json"
+    p.write_text(json.dumps({"dev": {"emoji": "👷", "bg": [255, 231, 93], "tab": True}}))
+    out = app.cmd_command_start("dev", commands_path=p)
+    assert escapes.tab_color((255, 231, 93)) in out
 
 
 def test_command_start_unknown_command_returns_empty(tmp_path):

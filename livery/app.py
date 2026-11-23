@@ -190,7 +190,7 @@ def cmd_command_start(name, commands_path=DEFAULT_COMMANDS_FILE):
 
     Bewust géén profielwissel: zo blijven de favicon, de projectnaam én het
     profiel intact. We tinten achtergrond + voorgrond + het 16-kleuren palet
-    naar de commandokleur, kleuren de tab in diezelfde kleur, en zetten enkel
+    naar de commandokleur, laten de tab in de projectkleur, en zetten enkel
     de emoji als sessienaam (het profiel levert al de projectnaam, dus de tab
     toont bv. 'ICT&H: 👷'). Reset via cmd_command_end + _livery_run."""
     cfg = commands.load(commands_path).get(name)
@@ -205,7 +205,10 @@ def cmd_command_start(name, commands_path=DEFAULT_COMMANDS_FILE):
     if not palette.is_dark(bg_hex):
         for i, hexcol in enumerate(palette.ANSI):
             out += escapes.ansi_color(i, hexcol)
-    out += escapes.tab_color((r, g, b))  # tab-rand in de commandokleur
+    # De tab behoudt standaard de projectkleur (zie je bij meerdere claude-tabs
+    # welk project het is); alleen met "tab": true kleurt hij mee.
+    if cfg.get("tab"):
+        out += escapes.tab_color((r, g, b))
     if emoji:
         out += escapes.title(emoji)     # sessienaam = alleen de emoji
     return out
